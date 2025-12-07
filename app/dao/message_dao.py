@@ -15,7 +15,7 @@ class MsgDAO:
 
     @staticmethod
     async def add(conv_id: str, role: str, content: str, db) -> str:
-        mid = str(ulid.new())
+        mid = str(ulid.ULID())
         db.add(Message(msg_id=mid, conv_id=conv_id, role=role, content=content))
         await db.flush()
         return mid

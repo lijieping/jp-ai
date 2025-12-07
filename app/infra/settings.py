@@ -19,7 +19,7 @@ class _Settings(BaseSettings):
     # 登录相关
     JWT_SECRET: str
     JWT_ALGORITHM: str
-    JWT_ACCESS_TOKEN_EXPIRE_DAYS: int
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
 
     # FAISS相关
     FAISS_STORE_PATH: str

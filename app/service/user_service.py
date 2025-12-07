@@ -23,7 +23,7 @@ def authenticate(username: str, password: str) -> UserInfo:
 
 def create_jwt(user_id: int) -> str:
     now = datetime.now(tz=timezone.utc)
-    expire = now + timedelta(days=SETTINGS.JWT_ACCESS_TOKEN_EXPIRE_DAYS)
+    expire = now + timedelta(minutes=SETTINGS.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     # 根据jwt规范，把user_id转成str格式
     payload = {"sub": str(user_id), "iat": now, "exp": expire}
     return jwt.encode(payload, SETTINGS.JWT_SECRET, algorithm=SETTINGS.JWT_ALGORITHM)

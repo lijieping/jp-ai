@@ -21,7 +21,7 @@ async def message_create(msg_create:MsgCreate):
 
     with DbSession() as db:
         # 先写 user 消息（非流式）
-        user_msg = Message(msg_id=str(ulid.new()),conv_id=conv_id,role="user",content=user_content)
+        user_msg = Message(msg_id=str(ulid.ULID),conv_id=conv_id,role="user",content=user_content)
         db.add(user_msg)
         # 流式生成助手消息
         assistant_content = ""
@@ -30,7 +30,7 @@ async def message_create(msg_create:MsgCreate):
             yield delta  # SSE 用
 
         # 流结束， 写助手消息
-        assistant_msg = Message(msg_id=str(ulid.new()), conv_id=conv_id, role="assistant", content=assistant_content)
+        assistant_msg = Message(msg_id=str(ulid.ULID()), conv_id=conv_id, role="assistant", content=assistant_content)
         db.add(assistant_msg)
         db.commit()
         db.close()

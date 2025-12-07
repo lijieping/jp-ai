@@ -17,7 +17,7 @@ class ConvDAO:
     @staticmethod
     def create(user_id: int, meta: dict) -> str:
         with DbSession() as db:
-            cid = str(ulid.new())
+            cid = str(ulid.ULID())
             db.add(Conversation(conv_id=cid, user_id=user_id, meta=meta))
             db.commit()
             db.close()
