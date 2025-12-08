@@ -15,6 +15,6 @@ def login(body: LoginReq):
             status_code=401,
             detail="账号或密码错误",
         )
-    token = user_service.create_jwt(userInfo.userId)
+    token = user_service.create_jwt(userInfo)
     return R.ok(LoginResp(token=token, userInfo=userInfo))
 

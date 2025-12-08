@@ -1,7 +1,13 @@
+from enum import Enum
 from typing import Optional
 
 from app.infra.mysql import Base, DbSession
 from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, SmallInteger, BigInteger, func, select
+
+class UserRole(Enum):
+    ADMIN = "admin"
+    USER = "user"
+    GUEST = "guest"
 
 class User(Base):
     __tablename__ = "user"
@@ -9,10 +15,10 @@ class User(Base):
     username   = Column(String(50), nullable=False)
     password   = Column(String(255), nullable=False)
     role = Column(
-        SQLEnum('admin', 'user', name='role'),  # 与数据库 ENUM 完全一致
+        SQLEnum(UserRole.ADMIN.value, UserRole.USER.value,UserRole.GUEST.value, name='role'),  # 与数据库 ENUM 完全一致
         nullable=False,
-        default='user',
-        server_default='user'  # 让 MySQL 也走默认值
+        default=UserRole.ADMIN.value,
+        server_default=UserRole.ADMIN.value
     )
     status     = Column(SmallInteger, default=1)
     created_at = Column(DateTime(), server_default=func.now())

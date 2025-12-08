@@ -7,6 +7,7 @@ class LoginReq(BaseModel):
 class UserInfo(BaseModel):
     userId:int
     username: str
+    role: str
 
 class LoginResp(BaseModel):
     token: str

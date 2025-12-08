@@ -1,6 +1,7 @@
 import asyncio
 from typing import List
 
+from app.infra.log import logger
 from app.infra.tool import is_empty_string
 from app.schemas.page_schema import Page
 
@@ -21,8 +22,9 @@ async def message_create(msg_create:MsgCreate):
 
     with DbSession() as db:
         # 先写 user 消息（非流式）
-        user_msg = Message(msg_id=str(ulid.ULID),conv_id=conv_id,role="user",content=user_content)
+        user_msg = Message(msg_id=str(ulid.ULID()),conv_id=conv_id,role="user",content=user_content)
         db.add(user_msg)
+        logger.debug("db写用户消息：%s",user_msg)
         # 流式生成助手消息
         assistant_content = ""
         async for delta in agent_service.token_generator(user_content, conv_id):
@@ -31,9 +33,11 @@ async def message_create(msg_create:MsgCreate):
 
         # 流结束， 写助手消息
         assistant_msg = Message(msg_id=str(ulid.ULID()), conv_id=conv_id, role="assistant", content=assistant_content)
+        logger.debug("流结束，db写助手消息：%s", assistant_msg)
         db.add(assistant_msg)
         db.commit()
         db.close()
+        logger.debug("流结束，db commit+close")
 
 def message_list(conv_id: str):
     items = MsgDAO.list_by_conv_id(conv_id)

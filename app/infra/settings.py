@@ -6,7 +6,6 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 
 class _Settings(BaseSettings):
     # 基础配置
-    DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
     #项目模式：lite、std
@@ -20,6 +19,8 @@ class _Settings(BaseSettings):
     JWT_SECRET: str
     JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
+    GUEST_USER_ID:int
+    GUEST_CHAT_ALLOW_PROBABILITY:float
 
     # FAISS相关
     FAISS_STORE_PATH: str

@@ -1,16 +1,21 @@
-from fastapi import APIRouter,Request
+from fastapi import APIRouter, Request, HTTPException
 from sse_starlette import EventSourceResponse
 
 from app.api.api_response import R
+from app.infra.settings import SETTINGS
 from app.service import conversation_service
 from app.schemas.conversation_schema import ConvIn
 from app.schemas.message_schema import MsgCreate
+import random
 
 router = APIRouter(prefix="/conversation", tags=["conversation"])
 
 @router.post("/{conv_id}/message")
-async def message_post(body: MsgCreate):
-    # 业务逻辑封装成流式返回
+async def message_post(request: Request, body: MsgCreate):
+    #简单控制访客的请求量
+    if request.state.user_id == SETTINGS.GUEST_USER_ID:
+        if random.random() > SETTINGS.GUEST_CHAT_ALLOW_PROBABILITY:
+            raise HTTPException(status_code=403, detail="您的聊天次数超限，请登录或稍后再试")
     async def generate():
         async for delta in conversation_service.message_create(body):
             yield f"{delta}\n\n"
