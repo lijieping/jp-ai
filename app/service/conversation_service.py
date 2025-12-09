@@ -16,7 +16,7 @@ from app.schemas.conversation_schema import ConvOut
 from app.schemas.message_schema import MsgCreate, MsgOut
 
 
-async def message_create(msg_create:MsgCreate):
+def message_create(msg_create:MsgCreate):
     conv_id = msg_create.conv_id
     user_content = msg_create.content
 
@@ -27,7 +27,7 @@ async def message_create(msg_create:MsgCreate):
         logger.debug("db写用户消息：%s",user_msg)
         # 流式生成助手消息
         assistant_content = ""
-        async for delta in agent_service.token_generator(user_content, conv_id):
+        for delta in agent_service.token_generator(user_content, conv_id):
             assistant_content += delta
             yield delta  # SSE 用
 

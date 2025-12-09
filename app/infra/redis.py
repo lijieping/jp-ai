@@ -15,7 +15,7 @@ def get_redis_client() -> redis.Redis:
     with _client_lock:
         if _redis_client is None:
             redis_url = SETTINGS.REDIS_URL
-            tmp = redis.asyncio.from_url(
+            tmp = redis.from_url(
                 redis_url,
                 encoding="utf-8",
                 decode_responses=True,

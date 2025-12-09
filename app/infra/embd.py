@@ -9,9 +9,6 @@ MIN_VERSION = "0.2.0"
 
 import fastembed
 from langchain_core.embeddings import Embeddings
-from langchain_ollama import OllamaEmbeddings
-
-from app.infra import settings
 
 """自己写FastEmbedEmbeddings，指定模型存储路径"""
 class FastEmbedBgeSmallEnV15(BaseModel, Embeddings):
@@ -127,10 +124,8 @@ class FastEmbedBgeSmallEnV15(BaseModel, Embeddings):
 
 
 def _init_embed() -> Tuple[Embeddings, int]:
-    if SETTINGS.PROJECT_MODE == "lite":
+    #if SETTINGS.PROJECT_MODE == "lite":
         e = FastEmbedBgeSmallEnV15()
         return e, e.dim
-    else:
-        return OllamaEmbeddings(), 0
 
 embed_dimension = _init_embed()

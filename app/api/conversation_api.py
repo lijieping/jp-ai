@@ -11,13 +11,13 @@ import random
 router = APIRouter(prefix="/conversation", tags=["conversation"])
 
 @router.post("/{conv_id}/message")
-async def message_post(request: Request, body: MsgCreate):
+def message_post(request: Request, body: MsgCreate):
     #简单控制访客的请求量
     if request.state.user_id == SETTINGS.GUEST_USER_ID:
         if random.random() > SETTINGS.GUEST_CHAT_ALLOW_PROBABILITY:
             raise HTTPException(status_code=403, detail="您的聊天次数超限，请登录或稍后再试")
-    async def generate():
-        async for delta in conversation_service.message_create(body):
+    def generate():
+        for delta in conversation_service.message_create(body):
             yield f"{delta}\n\n"
         yield "[DONE]\n\n"
     return EventSourceResponse(generate(), media_type="text/event-stream")

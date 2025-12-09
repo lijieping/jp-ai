@@ -1,23 +1,28 @@
 import asyncio
-from typing import Any
+import random
+import threading
+import time
+from typing import Any, Iterator, Sequence
 
 from langchain.agents.middleware import SummarizationMiddleware, before_model
 from langchain_community.chat_models import ChatTongyi
 from langchain_community.tools.asknews.tool import SearchInput
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import RemoveMessage, HumanMessage
-from langchain_core.stores import InMemoryStore
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
-from langgraph.checkpoint.base import BaseCheckpointSaver
+from langgraph.checkpoint.base import BaseCheckpointSaver, CheckpointTuple, Checkpoint, CheckpointMetadata, \
+    ChannelVersions
 from langgraph.checkpoint.memory import InMemorySaver
-from langgraph.checkpoint.redis import AsyncRedisSaver
-from langchain_mcp_adapters.client import MultiServerMCPClient
+from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
+from langgraph.checkpoint.redis import RedisSaver
 from langchain.agents import create_agent, AgentState
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from pydantic import BaseModel
 
 from app.infra.log import logger
+from app.infra.mysql import engine
 from app.infra.settings import SETTINGS
 from app.infra.redis import get_redis_client
 from app.service import rag_service, knowledge_service
@@ -32,11 +37,11 @@ def small_model_service(question: str) -> str:
     return ai_msg.content
 
 
-async def token_generator(question: str, conversation_id: str):
+def token_generator(question: str, conversation_id: str):
     # 配置对话id，用于记忆对话上下文
     config = {"configurable": {"thread_id": conversation_id}}
-    agent = await initialize_agent()
-    async for chunk in agent.astream(
+    agent = initialize_agent()
+    for chunk in agent.stream(
             {"messages": [HumanMessage(content=question)]},
             config=config
     ):
@@ -48,22 +53,89 @@ async def token_generator(question: str, conversation_id: str):
                 yield token
 
 
-_check_pointer: BaseCheckpointSaver | None
+class HybridCheckpointSaver(BaseCheckpointSaver):
+    def __init__(self) -> None:
+        super().__init__()
+        if SETTINGS.PROJECT_MODE == "lite":
+            self._cache_saver = InMemorySaver()
+            # 定期清理内存
+            def cleaner():
+                while True:
+                    time.sleep(60 * 60)
+                    logger.info('本地记忆清理')
+                    self._cache_saver = InMemorySaver()
+            threading.Thread(target=cleaner, daemon=True).start()
+        else:
+            self._cache_saver = RedisSaver(redis_client=get_redis_client(),
+                                           ttl={"default_ttl": 120, "refresh_on_read": True})
+            self._cache_saver.setup()  # 首次运行建表
+
+        self._db_saver = PyMySQLSaver(conn=engine.pool.connect())
+        self._db_saver.setup()
+
+    def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
+        tup = self._cache_saver.get_tuple(config)
+        if tup is None:
+            tup = self._db_saver.get_tuple(config)
+            if tup is None:
+                return None
+            self._cache_saver.put(tup.config, tup.checkpoint, tup.metadata, {})
+        return tup
+
+    def list(
+            self,
+            config: RunnableConfig | None,
+            *,
+            filter: dict[str, Any] | None = None,
+            before: RunnableConfig | None = None,
+            limit: int | None = None,
+    ) -> Iterator[CheckpointTuple]:
+
+        return self._db_saver.list(config, filter=filter, before=before, limit=limit)
+
+    def put(
+            self,
+            config: RunnableConfig,
+            checkpoint: Checkpoint,
+            metadata: CheckpointMetadata,
+            new_versions: ChannelVersions,
+    ) -> RunnableConfig:
+
+        self._db_saver.put(config, checkpoint, metadata, new_versions)
+        return self._cache_saver.put(config, checkpoint, metadata, new_versions)
+
+    def put_writes(
+            self,
+            config: RunnableConfig,
+            writes: Sequence[tuple[str, Any]],
+            task_id: str,
+            task_path: str = "",
+    ) -> None:
+
+        self._db_saver.put_writes(config, writes, task_id, task_path)
+        return self._cache_saver.put_writes(config, writes, task_id, task_path)
+
+    def delete_thread(
+            self,
+            thread_id: str,
+    ) -> None:
+        self._db_saver.delete_thread(thread_id)
+        self._cache_saver.delete_thread(thread_id)
+        raise NotImplementedError
+
+    def get_next_version(self, current: str | None, channel: None) -> str:
+        if current is None:
+            current_v = 0
+        elif isinstance(current, int):
+            current_v = current
+        else:
+            current_v = int(current.split(".")[0])
+        next_v = current_v + 1
+        next_h = random.random()
+        return f"{next_v:032}.{next_h:016}"
 
 
-def init_checkpointer():
-    global _check_pointer
-    if SETTINGS.PROJECT_MODE == "lite":
-        # 本地内存记忆
-        _check_pointer = InMemorySaver()
-    else:
-        # redis记忆
-        redis_client = get_redis_client()
-        checkpointer = AsyncRedisSaver(redis_client=redis_client, ttl={"default_ttl": 120, "refresh_on_read": True})
-        asyncio.run(checkpointer.setup())  # 首次运行建表
-
-
-init_checkpointer()
+checkpointer = HybridCheckpointSaver()
 
 
 def init_main_model() -> BaseChatModel:
@@ -142,7 +214,7 @@ def init_memory_pattern_middlewares(summary_model: BaseChatModel) -> list:
     return [summarization_middleware, trim_messages]
 
 
-async def initialize_agent():
+def initialize_agent():
     main_model = init_main_model()
     system_prompt = init_sys_prompt()
     # TODO 结构化输出
@@ -150,7 +222,7 @@ async def initialize_agent():
     middleware = []
     middleware.extend(init_memory_pattern_middlewares(main_model))
 
-    tools = await build_tools()
+    tools = asyncio.run(build_tools())
 
     # LangChain 1.0 中构建智能体的标准方式
     _agent_instance = create_agent(
@@ -158,7 +230,7 @@ async def initialize_agent():
         tools=tools,
         middleware=middleware,
         system_prompt=system_prompt,
-        checkpointer=_check_pointer
+        checkpointer=checkpointer
     )
 
     return _agent_instance

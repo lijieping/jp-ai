@@ -1,14 +1,10 @@
-import os
-from pathlib import Path
 
-from chromadb.utils.embedding_functions import OllamaEmbeddingFunction
 from langchain_community.vectorstores import FAISS
 
 from app.infra import vecstore, embd
 from app.infra.settings import SETTINGS
 
 chroma_client_instance = None
-ollama_embd_function = OllamaEmbeddingFunction(model_name="bge-m3")
 
 
 
