@@ -34,7 +34,7 @@ def query_lite_mode(collection_name: str, question, k: int = 15):
     # 懒加载磁盘，节省内存
     vector_store = FAISS.load_local(
         folder_path=SETTINGS.FAISS_STORE_PATH,
-        embeddings=embd.embed_dimension,
+        embeddings=embd.embed_dimension[0],
         index_name=collection_name,
         allow_dangerous_deserialization=True
     )

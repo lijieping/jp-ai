@@ -127,7 +127,7 @@ class FastEmbedBgeSmallEnV15(BaseModel, Embeddings):
 
 
 def _init_embed() -> Tuple[Embeddings, int]:
-    if settings.is_lite_mode():
+    if SETTINGS.PROJECT_MODE == "lite":
         e = FastEmbedBgeSmallEnV15()
         return e, e.dim
     else:
