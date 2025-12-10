@@ -137,7 +137,7 @@ class KnowledgeTool(BaseTool):
     args_schema: type[BaseModel] = SearchInput
     vector_collection: str
 
-    def _run(self, query: str) -> str:
+    def _run(self, query: str, *args: Any, **kwargs: Any) -> str:
         logger.debug("开始在知识空间[%s]内检索，query：[%s]", self.name, query)
         return rag_service.query_lite_mode(self.vector_collection, question=query)
 
