@@ -1,0 +1,46 @@
+version: "0.0.1"
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      LOG_LEVEL: INFO
+      MYSQL_URL: mysql+pymysql://root:password123@127.0.0.1:3306/ai_agent
+      JWT_SECRET: change-me-please
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      GUEST_USER_ID: 666
+      GUEST_CHAT_ALLOW_PROBABILITY: 0.3
+      VECTOR_STORE_MODE: chroma
+      FAISS_STORE_PATH: /data/dev_env_repo/faiss
+      CHROMA_HOST: 127.0.0.1
+      CHROMA_PORT: 8000
+      chroma_http_keepalive_secs: 30.0
+      chroma_http_max_connections: 10
+      chroma_http_max_keepalive_connections: 5
+      AGENT_MEM_MODE: memory
+      REDIS_URL: redis://default:password456@127.0.0.1:6379
+      FILE_STORE_PATH: /data/dev_env_repo/file
+      MODEL_BGE_SMALL_EN_V15_STORE_PATH: /data/model-repo/models--qdrant--bge-small-en-v1.5-onnx-q
+      DASHSCOPE_API_KEY: sk-xxb3axxxxxx446ba6666d2f18df094h
+      EASYOCR_MODULE_PATH: /data/model-repo/easyocr
+    volumes:
+      - /data/dev_env_repo/faiss:/data/dev_env_repo/faiss # faiss持久化
+      - /data/dev_env_repo/file:/data/dev_env_repo/file # 文件存储
+      - /data/model-repo/models--qdrant--bge-small-en-v1.5-onnx-q:/data/model-repo/models--qdrant--bge-small-en-v1.5-onnx-q # bge-small-en-v1.5模型所在dir
+      - /data/model-repo/easyocr:/data/model-repo/easyocr # easyocr所在dir
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:9000
+    ports:
+      - "80:4173"
+    depends_on:
+      - backend

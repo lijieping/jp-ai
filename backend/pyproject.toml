@@ -1,0 +1,51 @@
+[project]
+name = "jp-ai"
+version = "0.0.1"
+description = "ai智能体项目"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "bcrypt==5.0.0", # 加密工具
+    "beautifulsoup4==4.14.3", # HTML/XML标签解析
+    "dashscope==1.25.1", # 百炼sdk
+    "docx2txt==0.9",
+    "easyocr==1.7.2", # 图片文字识别
+    "torch==2.9.1+cpu", # easyocr依赖torch，torch用cpu版，避免linux/容器安装cuda
+    "torchvision==0.24.1+cpu",
+    "faiss-cpu==1.13.0", # 向量数据库
+    "fastapi==0.121.3",
+    "fastembed==0.7.3", #内置embedding模型
+    "langchain==1.0.8",
+    "langchain-chroma==1.0.0", # chroma sdk
+    "langchain-community==0.4.1",
+    "langchain-excel-loader>=0.1.1", # langchain包装openpyxl
+    "langchain-mcp-adapters==0.1.13",
+    "langgraph-checkpoint-redis==0.2.1",
+    "langgraph-checkpoint-mysql[pymysql]>=2.0.17",
+    "openpyxl==3.1.5", # excel识别
+    "pandas==2.3.3", # 表格处理
+    "pdf2image==1.17.0", # pdf转img
+    "pyjwt==2.10.1", # 接口鉴权
+    "pymysql==1.1.2", # mysql
+    "pypdf==6.3.0",
+    "python-pptx==1.0.2", # ppt识别
+    "sqlalchemy==2.0.44",
+    "uvicorn[standard]==0.38.0",
+    "python-ulid==3.1.0",
+]
+
+[tool.uv]
+index-strategy = "unsafe-best-match"
+
+[tool.uv.sources]
+# 核心配置：只为torch包指定阿里云源，其他包（包括其依赖）会按索引顺序查找
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "highest"
+type = "find-links"
+
+[[tool.uv.index]]
+name = "tsinghua"
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"

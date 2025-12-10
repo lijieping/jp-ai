@@ -1,0 +1,9 @@
+doc
+scripts
+services/backend/tests
+__pycache__
+*.pyc
+.venv
+.env.example
+.dockerignore
+.idea

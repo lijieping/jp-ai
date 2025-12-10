@@ -1,5 +1,7 @@
 .idea
+.vscode
 .venv
 __pycache__/
 *.pyc
-.env.private
+node_modules
+docker-compose.dev.yml
