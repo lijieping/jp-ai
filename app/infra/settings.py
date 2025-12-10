@@ -1,8 +1,11 @@
 import os
 from functools import lru_cache
+
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
+_env_file_path_str = f".env.{ENVIRONMENT}"
 
 class _Settings(BaseSettings):
     ############################################## 通用配置
@@ -25,25 +28,28 @@ class _Settings(BaseSettings):
     GUEST_USER_ID:int
     GUEST_CHAT_ALLOW_PROBABILITY:float
 
-    # 项目模式：lite、std
-    PROJECT_MODE: str = "lite"
-    ############################################## lite模式组件及配置
-    # （向量存储）faiss文件存放目录
+    # agent checkpoint缓存选项
+    AGENT_MEM_MODE:str="memory" # memory/redis
+    REDIS_URL: str
+    # 向量数据库选项
+    VECTOR_STORE_MODE:str="faiss" # faiss/chroma
     FAISS_STORE_PATH: str
-    # （embedding）fastembed + bge-small-en-v1.5，模型存放位置
+    CHROMA_HOST: str
+    CHROMA_PORT: int
+    chroma_http_keepalive_secs: float = 30.0
+    chroma_http_max_connections: int = 10
+    chroma_http_max_keepalive_connections: int = 5
+    # embedding选项
     MODEL_BGE_SMALL_EN_V15_STORE_PATH: str
 
     ############################################## std模式组件及配置
     # （向量存储）chromadb/milvus，TODO
     # （embedding）BGE-M3配置，TODO
     # （对话记忆）redis url
-    REDIS_URL: str
 
     # Pydantic配置
     model_config = SettingsConfigDict(
-        env_file=(
-            f".env.{ENVIRONMENT}"
-        ),
+        env_file=_env_file_path_str,
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -56,6 +62,4 @@ def get_settings() -> _Settings:
 SETTINGS : _Settings = get_settings()
 
 def init_settings():
-    # 三方sdk所需环境变量，通过env设置到环境变量
-    os.environ.setdefault("DASHSCOPE_API_KEY", SETTINGS.DASHSCOPE_API_KEY)
-    os.environ.setdefault("EASYOCR_MODULE_PATH", SETTINGS.EASYOCR_MODULE_PATH)
+    load_dotenv(dotenv_path=_env_file_path_str)  # 把 .env 灌进 os.environ

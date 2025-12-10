@@ -28,7 +28,7 @@ class KbSpaceDAO:
     def list_all():
         """获取所有知识库空间"""
         with DbSession() as db:
-            return db.query(KbSpace).all()
+            return db.query(KbSpace).filter(KbSpace.status==1).all()
     
     @staticmethod
     def get_by_id(id: str):

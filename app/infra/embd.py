@@ -123,9 +123,8 @@ class FastEmbedBgeSmallEnV15(BaseModel, Embeddings):
         return cast(List[float], query_embeddings.tolist())
 
 
-def _init_embed() -> Tuple[Embeddings, int]:
+def _init_embed() -> Embeddings:
     #if SETTINGS.PROJECT_MODE == "lite":
-        e = FastEmbedBgeSmallEnV15()
-        return e, e.dim
+        return FastEmbedBgeSmallEnV15()
 
-embed_dimension = _init_embed()
+embed = _init_embed()

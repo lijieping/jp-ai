@@ -14,7 +14,7 @@ from langchain_excel_loader import StructuredExcelLoader
 from app.dao.rag_pipeline_record import RagPipelineRecordDAO
 from app.infra import embd
 from app.infra.log import logger
-from app.infra.vecstore import get_vecstore
+from app.infra.vecstore import get_faiss, get_chroma
 from app.infra.settings import SETTINGS
 from pathlib import Path
 from typing import List
@@ -128,10 +128,14 @@ class _ChunkHandler(Handler):
 
 class _EmbedAStoreHandler(Handler):
     def process(self, ctx: Context) -> None:
-        embed_dimension = embd.embed_dimension
-        vector_store = get_vecstore(embed_dimension[0], embed_dimension[1])
-        vector_store.add_documents(documents=ctx.chunks)
-        vector_store.save_local(folder_path=SETTINGS.FAISS_STORE_PATH, index_name=ctx.collection_name)
+        embedding_func = embd.embed
+        texts = [doc.page_content for doc in ctx.chunks]
+        if SETTINGS.VECTOR_STORE_MODE == "faiss":
+            vector_store = get_faiss(embedding_func, collection_name=ctx.collection_name)
+            vector_store.add_documents(documents=ctx.chunks)
+        else:
+            vector_store = get_chroma(embedding_func, collection_name=ctx.collection_name)
+            vector_store.add_texts(texts)
 
 # 模块级单例
 _chain_head : Final[Handler] = _DataCleanHandler()

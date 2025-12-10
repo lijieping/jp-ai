@@ -1,7 +1,5 @@
 import asyncio
 import random
-import threading
-import time
 from typing import Any, Iterator, Sequence
 
 from langchain.agents.middleware import SummarizationMiddleware, before_model
@@ -13,18 +11,15 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver, CheckpointTuple, Checkpoint, CheckpointMetadata, \
     ChannelVersions
-from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
-from langgraph.checkpoint.redis import RedisSaver
 from langchain.agents import create_agent, AgentState
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
 from pydantic import BaseModel
 
+from app.infra.agent_memory import get_agent_memory
 from app.infra.log import logger
 from app.infra.mysql import engine
-from app.infra.settings import SETTINGS
-from app.infra.redis import get_redis_client
 from app.service import rag_service, knowledge_service
 
 
@@ -56,20 +51,7 @@ def token_generator(question: str, conversation_id: str):
 class HybridCheckpointSaver(BaseCheckpointSaver):
     def __init__(self) -> None:
         super().__init__()
-        if SETTINGS.PROJECT_MODE == "lite":
-            self._cache_saver = InMemorySaver()
-            # 定期清理内存
-            def cleaner():
-                while True:
-                    time.sleep(60 * 60)
-                    logger.info('本地记忆清理')
-                    self._cache_saver = InMemorySaver()
-            threading.Thread(target=cleaner, daemon=True).start()
-        else:
-            self._cache_saver = RedisSaver(redis_client=get_redis_client(),
-                                           ttl={"default_ttl": 120, "refresh_on_read": True})
-            self._cache_saver.setup()  # 首次运行建表
-
+        self._cache_saver = get_agent_memory()
         self._db_saver = PyMySQLSaver(conn=engine.pool.connect())
         self._db_saver.setup()
 

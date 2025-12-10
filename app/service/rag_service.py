@@ -1,8 +1,10 @@
 
 from langchain_community.vectorstores import FAISS
 
-from app.infra import vecstore, embd
+from app.infra import embd
+from app.infra.log import logger
 from app.infra.settings import SETTINGS
+from app.infra.vecstore import get_chroma
 
 chroma_client_instance = None
 
@@ -28,10 +30,18 @@ chroma_client_instance = None
 
 def query_lite_mode(collection_name: str, question, k: int = 15):
     # 懒加载磁盘，节省内存
-    vector_store = FAISS.load_local(
-        folder_path=SETTINGS.FAISS_STORE_PATH,
-        embeddings=embd.embed_dimension[0],
-        index_name=collection_name,
-        allow_dangerous_deserialization=True
-    )
+    if SETTINGS.VECTOR_STORE_MODE == "faiss":
+        try:
+            vector_store = FAISS.load_local(
+                folder_path=SETTINGS.FAISS_STORE_PATH,
+                embeddings=embd.embed,
+                index_name=collection_name, # todo faiss空间中没有文件时会报错
+                allow_dangerous_deserialization=True
+            )
+        except Exception as e:
+            logger.warning(e)
+            raise Exception(f"加载知识库空间[{collection_name}]报错")
+    else:
+        vector_store = get_chroma(embedding_function=embd.embed, collection_name=collection_name)
+
     return vector_store.similarity_search(query=question, k=k)
