@@ -14,6 +14,7 @@ from langchain_excel_loader import StructuredExcelLoader
 from app.dao.rag_pipeline_record import RagPipelineRecordDAO
 from app.infra import embd
 from app.infra.log import logger
+from app.infra.ocr import ocr_parse
 from app.infra.vecstore import get_faiss, get_chroma
 from app.infra.settings import SETTINGS
 from pathlib import Path
@@ -108,7 +109,7 @@ class _DataCleanHandler(Handler):
             # todo 图片部分， 拿到图的位置并ocr，把ocr结果按位置插入到文字中， 或者直接上unstructure
         # 3. 纯图片格式
         elif ctx.ext in self._support_exts["img"]["exts"]:
-            texts = self._easyocr_reader.readtext(ctx.file_url, detail=0)
+            texts = ocr_parse(ctx.file_url)
             ctx.pages = [Document(page_content=text) for text in texts]
         # 4. 其他 → 抛异常 or 按需扩展
         else:

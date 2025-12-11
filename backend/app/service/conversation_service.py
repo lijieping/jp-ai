@@ -16,28 +16,40 @@ from app.schemas.conversation_schema import ConvOut
 from app.schemas.message_schema import MsgCreate, MsgOut
 
 
-def message_create(msg_create:MsgCreate):
+def message_create(msg_create: MsgCreate):
     conv_id = msg_create.conv_id
     user_content = msg_create.content
 
+    # 1. 开启一个手动事务（autocommit=False 是默认，无需改）
     with DbSession() as db:
-        # 先写 user 消息（非流式）
-        user_msg = Message(msg_id=str(ulid.ULID()),conv_id=conv_id,role="user",content=user_content)
-        db.add(user_msg)
-        logger.debug("db写用户消息：%s",user_msg)
-        # 流式生成助手消息
-        assistant_content = ""
-        for delta in agent_service.token_generator(user_content, conv_id):
-            assistant_content += delta
-            yield delta  # SSE 用
+        with db.begin():                       # ← 显式事务开始
+            # 写 user 消息
+            user_msg = Message(
+                msg_id=str(ulid.ULID()),
+                conv_id=conv_id,
+                role="user",
+                content=user_content
+            )
+            db.add(user_msg)
+            # 注意：这里不 commit，等流结束一起提交
 
-        # 流结束， 写助手消息
-        assistant_msg = Message(msg_id=str(ulid.ULID()), conv_id=conv_id, role="assistant", content=assistant_content)
-        logger.debug("流结束，db写助手消息：%s", assistant_msg)
-        db.add(assistant_msg)
-        db.commit()
-        db.close()
-        logger.debug("流结束，db commit+close")
+            # 2. 流式生成助手消息（不落库，只攒内存）
+            assistant_content = ""
+            for delta in agent_service.token_generator(user_content, conv_id):
+                assistant_content += delta
+                yield delta          # ← 立刻吐给 SSE
+
+            # 3. 流正常结束，再写助手消息
+            assistant_msg = Message(
+                msg_id=str(ulid.ULID()),
+                conv_id=conv_id,
+                role="assistant",
+                content=assistant_content
+            )
+            db.add(assistant_msg)
+
+        # 4. 事务块结束时会自动 commit（db.begin 上下文管理器保证）
+        #    若 for 循环里抛异常，事务会自动 rollback，user_msg 也不会落库
 
 def message_list(conv_id: str):
     items = MsgDAO.list_by_conv_id(conv_id)

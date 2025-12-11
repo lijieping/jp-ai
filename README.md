@@ -14,6 +14,7 @@ AI对话系统+知识库RAG，支持在有限资源下进行轻量部署，目�
 - mysql 8.0  
 - python 3.13.0  
 - uv  
+- 卟言ocr api：https://qaqbuyan.com:88/api/， 实测响应速度和中文识别质量效果优于easyocr，作者：https://github.com/qaqbuyan
 - ocr模型：easyocr，语言：zh_sim_g2  
 - embedding模型：qdrant/bge-small-en-v1.5-onnx-q  
 - redis 8.x (非必须)

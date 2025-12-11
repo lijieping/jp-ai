@@ -17,8 +17,6 @@ class _Settings(BaseSettings):
     # 三方sdk所需环境变量，通过env设置到环境变量
     # 百炼api-key
     DASHSCOPE_API_KEY: str
-    # EasyOCR模型存放目录
-    EASYOCR_MODULE_PATH: str
 
     ############################################## 登录鉴权相关
     JWT_SECRET: str
@@ -38,6 +36,10 @@ class _Settings(BaseSettings):
     chroma_http_keepalive_secs: float = 30.0
     chroma_http_max_connections: int = 10
     chroma_http_max_keepalive_connections: int = 5
+    # ocr选项
+    OCR_MODE:str="buyan" # buyan/easyocr
+    # EasyOCR模型存放目录
+    EASYOCR_MODULE_PATH: str
     # embedding选项
     MODEL_BGE_SMALL_EN_V15_STORE_PATH: str
 

@@ -6,7 +6,7 @@ from langchain.agents.middleware import SummarizationMiddleware, before_model
 from langchain_community.chat_models import ChatTongyi
 from langchain_community.tools.asknews.tool import SearchInput
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import RemoveMessage, HumanMessage
+from langchain_core.messages import RemoveMessage, HumanMessage, AIMessageChunk
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver, CheckpointTuple, Checkpoint, CheckpointMetadata, \
@@ -15,6 +15,7 @@ from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
 from langchain.agents import create_agent, AgentState
 from langgraph.graph.message import REMOVE_ALL_MESSAGES
 from langgraph.runtime import Runtime
+import langsmith as ls
 from pydantic import BaseModel
 
 from app.infra.agent_memory import get_agent_memory
@@ -29,24 +30,27 @@ def small_model_service(question: str) -> str:
     model_name = "qwen2.5-3b-instruct"
     # 创建千问model对象，要确保已设置api_key到系统变量DASHSCOPE_API_KEY
     model = ChatTongyi(model=model_name)
-    ai_msg = model.invoke(question)
-    return ai_msg.content
+    with ls.tracing_context(enabled=True, project_name="small-model"):
+        ai_msg = model.invoke(question)
+        return ai_msg.content
 
 
 def token_generator(question: str, conversation_id: str):
     # 配置对话id，用于记忆对话上下文
     config = {"configurable": {"thread_id": conversation_id}}
     agent = initialize_agent()
-    for chunk in agent.stream(
-            {"messages": [HumanMessage(content=question)]},
-            config=config
-    ):
-        logger.debug(f"=========conv_id:%s, chunk:%s", conversation_id, chunk)
-        # chunk 结构如 {'model': {'messages': [AIMessageChunk(content="abc")]}}
-        if "model" in chunk and chunk["model"]["messages"]:
-            token = chunk["model"]["messages"][-1].content
-            if token:  # 避免空事件
-                yield token
+    with ls.tracing_context(enabled=True, project_name="jp-ai"):
+        for chunk in agent.stream(
+                {"messages": [HumanMessage(content=question)]},
+                config=config,
+                stream_mode="messages"  # messages模式，最细粒度，逐字
+        ):
+            logger.debug(f"=========conv_id:%s, chunk:%s", conversation_id, chunk)
+            # chunk 结构如 {'model': {'messages': [AIMessageChunk(content="abc")]}}
+            if isinstance(chunk[0], AIMessageChunk):  # 类型级判断
+                token = chunk[0].content
+                if token:  # 过滤空串
+                    yield token
 
 
 class HybridCheckpointSaver(BaseCheckpointSaver):
@@ -124,7 +128,7 @@ checkpointer = HybridCheckpointSaver()
 def init_main_model() -> BaseChatModel:
     model_name = "qwen-max"
     # 创建千问model对象，要确保已设置api_key到系统变量DASHSCOPE_API_KEY
-    return ChatTongyi(model=model_name)
+    return ChatTongyi(model=model_name, streaming=True) # 模型也要设置streaming=True，不然agent.stream()不生效
 
 
 def init_sys_prompt() -> str:
@@ -213,7 +217,7 @@ def initialize_agent():
         tools=tools,
         middleware=middleware,
         system_prompt=system_prompt,
-        checkpointer=checkpointer
+        checkpointer=checkpointer,
     )
 
     return _agent_instance

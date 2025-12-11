@@ -17,7 +17,7 @@ export const request = hookFetch.create<BaseResponse, 'data' | 'rows'>({
   headers: {
     'Content-Type': 'application/json',
   },
-  plugins: [sseTextDecoderPlugin({ json: true, prefix: 'data:' })],
+  plugins: [sseTextDecoderPlugin({ splitSeparator:'\r\n', json: true, prefix: 'data:' })],
 });
 
 export const request4File = hookFetch.create<BaseResponse, 'data' | 'rows'>({

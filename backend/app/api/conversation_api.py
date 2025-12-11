@@ -18,6 +18,7 @@ def message_post(request: Request, body: MsgCreate):
             raise HTTPException(status_code=403, detail="您的聊天次数超限，请登录或稍后再试")
     def generate():
         for delta in conversation_service.message_create(body):
+            # print(delta, end="", flush=True)
             yield f"{delta}\n\n"
         yield "[DONE]\n\n"
     return EventSourceResponse(generate(), media_type="text/event-stream")

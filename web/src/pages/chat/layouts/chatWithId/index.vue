@@ -93,8 +93,6 @@ watch(
 // 封装数据处理逻辑
 function handleDataChunk(chunk: AnyObject) {
   try{
-    console.log('=====handleDataChunk', chunk);
-    console.log('====================================');
 
     // 1. 按 SSE 帧边界拆分
     const frames = chunk.split('\r\n').filter(Boolean);
@@ -102,7 +100,6 @@ function handleDataChunk(chunk: AnyObject) {
       if (!frame.startsWith('data:')) continue;
       const str = frame.slice(5).trim(); // 去掉 "data:"
       if (str === '[DONE]') break;      // 结束标记（可选）
-      console.log(str);  
       bubbleItems.value[bubbleItems.value.length - 1].content += str;
     }
     bubbleItems.value[bubbleItems.value.length - 1].loading = false;
@@ -142,6 +139,7 @@ async function startSSE(chatContent: string) {
       role: 'user',
       conv_id: route.params?.id !== 'not_login' ? String(route.params?.id) : undefined,
     })) {
+      console.log('=====handleDataChunk', chunk.result);
       handleDataChunk(chunk.result as AnyObject);
     }
   }
