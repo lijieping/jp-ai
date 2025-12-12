@@ -18,6 +18,14 @@ class _Settings(BaseSettings):
     # 百炼api-key
     DASHSCOPE_API_KEY: str
 
+    ##############################################AGENT配置
+    # 上下文汇总token数上限
+    AGENT_MSG_SUMMARY_MAX_BEFORE: int = 4000
+    # 汇总保留消息数
+    AGENT_MSG_SUMMARY_TO_KEEP:int = 15
+    # 修剪保留消息数
+    AGENT_MSG_TRIM_TO_KEEP:int = 15
+
     ############################################## 登录鉴权相关
     JWT_SECRET: str
     JWT_ALGORITHM: str

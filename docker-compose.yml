@@ -28,6 +28,9 @@ services:
       OCR_MODE: buyan
       EASYOCR_MODULE_PATH: /data/model-repo/easyocr
       LANGSMITH_API_KEY: xxxx
+      AGENT_MSG_SUMMARY_MAX_BEFORE: 4000
+      AGENT_MSG_SUMMARY_TO_KEEP: 15
+      AGENT_MSG_TRIM_TO_KEEP: 15
     volumes:
       - /data/dev_env_repo/faiss:/data/dev_env_repo/faiss # faiss持久化
       - /data/dev_env_repo/file:/data/dev_env_repo/file # 文件存储

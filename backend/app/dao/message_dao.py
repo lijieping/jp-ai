@@ -5,7 +5,7 @@ from app.infra.mysql import Base, DbSession
 
 class Message(Base):
     __tablename__ = "message"
-    msg_id = Column(String(26), primary_key=True)
+    msg_id = Column(String(100), primary_key=True) # 适应langchain的msg_id长度
     conv_id = Column(String(26), nullable=False, index=True)
     role = Column(Enum("user", "assistant"), nullable=False)
     content = Column(Text, nullable=False)

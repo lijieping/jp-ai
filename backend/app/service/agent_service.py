@@ -6,7 +6,7 @@ from langchain.agents.middleware import SummarizationMiddleware, before_model
 from langchain_community.chat_models import ChatTongyi
 from langchain_community.tools.asknews.tool import SearchInput
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import RemoveMessage, HumanMessage, AIMessageChunk
+from langchain_core.messages import RemoveMessage, HumanMessage, AIMessageChunk, BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver, CheckpointTuple, Checkpoint, CheckpointMetadata, \
@@ -21,15 +21,19 @@ from pydantic import BaseModel
 from app.infra.agent_memory import get_agent_memory
 from app.infra.log import logger
 from app.infra.mysql import engine
+from app.infra.settings import SETTINGS
 from app.service import rag_service
 from app.service import knowledge_service
 
-
-def small_model_service(question: str) -> str:
-    """轻量模型服务，为系统做一些简单的工作"""
+def init_small_model() -> BaseChatModel:
     model_name = "qwen2.5-3b-instruct"
     # 创建千问model对象，要确保已设置api_key到系统变量DASHSCOPE_API_KEY
-    model = ChatTongyi(model=model_name)
+    return ChatTongyi(model=model_name)
+
+
+def small_model_service(question: str) -> str:
+    model = init_small_model()
+    """轻量模型服务，为系统做一些简单的工作"""
     with ls.tracing_context(enabled=True, project_name="small-model"):
         ai_msg = model.invoke(question)
         return ai_msg.content
@@ -87,7 +91,6 @@ class HybridCheckpointSaver(BaseCheckpointSaver):
             metadata: CheckpointMetadata,
             new_versions: ChannelVersions,
     ) -> RunnableConfig:
-
         self._db_saver.put(config, checkpoint, metadata, new_versions)
         return self._cache_saver.put(config, checkpoint, metadata, new_versions)
 
@@ -168,32 +171,52 @@ async def build_tools() -> list:
     return tools
 
 
-def init_memory_pattern_middlewares(summary_model: BaseChatModel) -> list:
-    """前汇总，再滑动窗口"""
-    summarization_middleware = SummarizationMiddleware(
-        model=summary_model,
-        max_tokens_before_summary=4000,
-        messages_to_keep=10,
+class CustomSummarizationMiddleware(SummarizationMiddleware):
+    def before_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
+        logger.error("汇总上下文")
+        res = super().before_model( state, runtime)
+        if res is None:
+            return None
+        else:
+            # 标记汇总出的新消息
+            src_msgs = state["messages"]
+            res_msgs:list = res["messages"]
+            n = min(len(src_msgs), len(res_msgs))
+            for i in range(1, n + 1):
+                m:BaseMessage = src_msgs[-i]
+                if m == res_msgs[-i]:
+                    continue
+                if m.additional_kwargs is None:
+                    m.additional_kwargs = {}
+                m.additional_kwargs["summary"] = True
+            return res
+
+
+@before_model
+def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
+    """Keep only the last few messages to fit context window."""
+    messages = state["messages"]
+    to_keep = SETTINGS.AGENT_MSG_TRIM_TO_KEEP
+    if len(messages) <= to_keep:
+        return None  # No changes needed
+    first_msg = messages[0]
+    recent_messages = messages[-to_keep:] if len(messages) % 2 == 0 else messages[-to_keep+1:]
+    new_messages = [first_msg] + recent_messages
+    return {
+        "messages": [
+            RemoveMessage(id=REMOVE_ALL_MESSAGES),
+            *new_messages
+        ]
+    }
+
+def init_memory_pattern_middlewares() -> list:
+    """先汇总，再滑动窗口"""
+
+    summarization_middleware = CustomSummarizationMiddleware(
+        model=init_small_model(),
+        max_tokens_before_summary=SETTINGS.AGENT_MSG_SUMMARY_MAX_BEFORE,
+        messages_to_keep=SETTINGS.AGENT_MSG_SUMMARY_TO_KEEP,
     )
-
-    @before_model
-    def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        """Keep only the last few messages to fit context window."""
-        messages = state["messages"]
-
-        if len(messages) <= 10:
-            return None  # No changes needed
-
-        first_msg = messages[0]
-        recent_messages = messages[-10:] if len(messages) % 2 == 0 else messages[-11:]
-        new_messages = [first_msg] + recent_messages
-
-        return {
-            "messages": [
-                RemoveMessage(id=REMOVE_ALL_MESSAGES),
-                *new_messages
-            ]
-        }
 
     return [summarization_middleware, trim_messages]
 
@@ -204,7 +227,7 @@ def initialize_agent():
     # TODO 结构化输出
 
     middleware = []
-    middleware.extend(init_memory_pattern_middlewares(main_model))
+    middleware.extend(init_memory_pattern_middlewares())
 
     tools = asyncio.run(build_tools())
 

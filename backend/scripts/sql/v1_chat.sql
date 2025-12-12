@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS ai_agent.conversation (
 
 -- 消息表
 CREATE TABLE IF NOT EXISTS ai_agent.message (
-    msg_id     CHAR(26) PRIMARY KEY,
+    msg_id     CHAR(100) PRIMARY KEY,
     conv_id    CHAR(26) NOT NULL,
     role       ENUM('user','assistant') NOT NULL,
     content    MEDIUMTEXT NOT NULL,
