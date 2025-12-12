@@ -91,25 +91,12 @@ watch(
 );
 
 // 封装数据处理逻辑
-function handleDataChunk(chunk: AnyObject) {
-  try{
-
-    // 1. 按 SSE 帧边界拆分
-    const frames = chunk.split('\r\n').filter(Boolean);
-    for (const frame of frames) {
-      if (!frame.startsWith('data:')) continue;
-      const str = frame.slice(5).trim(); // 去掉 "data:"
-      if (str === '[DONE]') break;      // 结束标记（可选）
-      bubbleItems.value[bubbleItems.value.length - 1].content += str;
-    }
+function handleDataChunk(frame: AnyObject) {
+    // sseTextDecoderPlugin源码：没开启json自动解析，或者开了json自动解析但JSON.parse失败（数据不是json格式），都不会做前缀移除了，这种情况需要调用方自己处理
+    const str = frame.slice(5).trim(); //移除'data:'
+    bubbleItems.value[bubbleItems.value.length - 1].content += str;
     bubbleItems.value[bubbleItems.value.length - 1].loading = false;
-    
-    // 触发会话标题生成
-    sessionStore.triggerGenerateTitle();
-  } catch (err) {
-    // 这里如果使用了中断，会有报错，可以忽略不管
-    console.error('解析数据时出错:', err);
-  }
+
 }
 
 // 封装错误处理逻辑
@@ -142,6 +129,8 @@ async function startSSE(chatContent: string) {
       console.log('=====handleDataChunk', chunk.result);
       handleDataChunk(chunk.result as AnyObject);
     }
+    // 触发会话标题生成
+    sessionStore.triggerGenerateTitle();
   }
   catch (err) {
     handleError(err);

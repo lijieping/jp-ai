@@ -19,8 +19,8 @@ def message_post(request: Request, body: MsgCreate):
     def generate():
         for delta in conversation_service.message_create(body):
             # print(delta, end="", flush=True)
-            yield f"{delta}\n\n"
-        yield "[DONE]\n\n"
+            yield f"{delta}" # uvicorn已自动加data:前缀和\r\n结尾
+        yield "[DONE]"
     return EventSourceResponse(generate(), media_type="text/event-stream")
 
 @router.get("/{conv_id}/message/list")

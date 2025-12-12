@@ -45,7 +45,7 @@ def token_generator(question: str, conversation_id: str):
                 config=config,
                 stream_mode="messages"  # messages模式，最细粒度，逐字
         ):
-            logger.debug(f"=========conv_id:%s, chunk:%s", conversation_id, chunk)
+            logger.info(f"=========conv_id:%s, chunk:%s", conversation_id, chunk)
             # chunk 结构如 {'model': {'messages': [AIMessageChunk(content="abc")]}}
             if isinstance(chunk[0], AIMessageChunk):  # 类型级判断
                 token = chunk[0].content
@@ -120,9 +120,6 @@ class HybridCheckpointSaver(BaseCheckpointSaver):
         next_v = current_v + 1
         next_h = random.random()
         return f"{next_v:032}.{next_h:016}"
-
-
-checkpointer = HybridCheckpointSaver()
 
 
 def init_main_model() -> BaseChatModel:
@@ -217,7 +214,7 @@ def initialize_agent():
         tools=tools,
         middleware=middleware,
         system_prompt=system_prompt,
-        checkpointer=checkpointer,
+        checkpointer=HybridCheckpointSaver(), # 每次新建一个，防止mysql连接丢失
     )
 
     return _agent_instance
