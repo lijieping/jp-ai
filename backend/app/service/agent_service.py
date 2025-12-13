@@ -6,7 +6,7 @@ from langchain.agents.middleware import SummarizationMiddleware, before_model
 from langchain_community.chat_models import ChatTongyi
 from langchain_community.tools.asknews.tool import SearchInput
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import RemoveMessage, HumanMessage, AIMessageChunk, BaseMessage
+from langchain_core.messages import RemoveMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver, CheckpointTuple, Checkpoint, CheckpointMetadata, \
@@ -44,17 +44,14 @@ def token_generator(question: str, conversation_id: str):
     config = {"configurable": {"thread_id": conversation_id}}
     agent = initialize_agent()
     with ls.tracing_context(enabled=True, project_name="jp-ai"):
-        for chunk in agent.stream(
+        for token, metadata in agent.stream(
                 {"messages": [HumanMessage(content=question)]},
                 config=config,
                 stream_mode="messages"  # messages模式，最细粒度，逐字
         ):
-            logger.info(f"=========conv_id:%s, chunk:%s", conversation_id, chunk)
-            # chunk 结构如 {'model': {'messages': [AIMessageChunk(content="abc")]}}
-            if isinstance(chunk[0], AIMessageChunk):  # 类型级判断
-                token = chunk[0].content
-                if token:  # 过滤空串
-                    yield token
+            """token:消息块； metadata：元数据，不暴露给业务"""
+            #print(f"=========conv_id:%s, chunk:%s", conversation_id, token)
+            yield token
 
 
 class HybridCheckpointSaver(BaseCheckpointSaver):
@@ -170,28 +167,6 @@ async def build_tools() -> list:
     # 其他 tools ...
     return tools
 
-
-class CustomSummarizationMiddleware(SummarizationMiddleware):
-    def before_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        logger.error("汇总上下文")
-        res = super().before_model( state, runtime)
-        if res is None:
-            return None
-        else:
-            # 标记汇总出的新消息
-            src_msgs = state["messages"]
-            res_msgs:list = res["messages"]
-            n = min(len(src_msgs), len(res_msgs))
-            for i in range(1, n + 1):
-                m:BaseMessage = src_msgs[-i]
-                if m == res_msgs[-i]:
-                    continue
-                if m.additional_kwargs is None:
-                    m.additional_kwargs = {}
-                m.additional_kwargs["summary"] = True
-            return res
-
-
 @before_model
 def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
     """Keep only the last few messages to fit context window."""
@@ -211,8 +186,7 @@ def trim_messages(state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
 
 def init_memory_pattern_middlewares() -> list:
     """先汇总，再滑动窗口"""
-
-    summarization_middleware = CustomSummarizationMiddleware(
+    summarization_middleware = SummarizationMiddleware(
         model=init_small_model(),
         max_tokens_before_summary=SETTINGS.AGENT_MSG_SUMMARY_MAX_BEFORE,
         messages_to_keep=SETTINGS.AGENT_MSG_SUMMARY_TO_KEEP,

@@ -57,7 +57,8 @@ watch(
     if (_id_) {
       // 判断的当前会话id是否有聊天记录，有缓存则直接赋值展示
       if (chatStore.chatMap[`${_id_}`] && chatStore.chatMap[`${_id_}`].length) {
-        bubbleItems.value = chatStore.chatMap[`${_id_}`] as MessageItem[];
+        const vo = chatStore.chatMap[`${_id_}`] as MessageItem[];
+        bubbleItems.value = vo
         // 滚动到底部
         setTimeout(() => {
           bubbleListRef.value!.scrollToBottom();
@@ -91,11 +92,16 @@ watch(
 );
 
 // 封装数据处理逻辑
-function handleDataChunk(frame: AnyObject) {
-    // sseTextDecoderPlugin源码：没开启json自动解析，或者开了json自动解析但JSON.parse失败（数据不是json格式），都不会做前缀移除了，这种情况需要调用方自己处理
-    const str = frame.slice(5).trim(); //移除'data:'
-    bubbleItems.value[bubbleItems.value.length - 1].content += str;
-    bubbleItems.value[bubbleItems.value.length - 1].loading = false;
+function handleDataChunk(chunk: AnyObject) {
+    // 数据处理在sseTextDecoderPlugin
+    const type = chunk["type"]
+    if (type === 'AIMessageChunk') {
+      bubbleItems.value[bubbleItems.value.length - 1].content += chunk['content'];
+      bubbleItems.value[bubbleItems.value.length - 1].loading = false;
+    } else if (type === 'tool_call_chunk') {
+      bubbleItems.value[bubbleItems.value.length - 1].content += '<span class="thinking">' + '调用工具：' + chunk["name"] + '</span>\n\n';
+      bubbleItems.value[bubbleItems.value.length - 1].loading = false;
+    }
 
 }
 
@@ -166,6 +172,7 @@ function addMessage(message: string, isUser: boolean) {
     isMarkdown: !isUser,
     loading: !isUser,
     typing: !isUser,
+    //noStyle: true,
     content: message || ''
   };
   bubbleItems.value.push(obj);
@@ -206,7 +213,9 @@ watch(
             :status="item.thinkingStatus" class="thinking-chain-warp" @change="handleChange"
           />
         </template> -->
-
+        <template #header="{ item }">
+          <template  v-if="item.role=='assistant'"><span>小光</span></template>
+        </template>
         <template #content="{ item }">
           <!-- chat 内容走 markdown -->
           <XMarkdown v-if="item.content && item.role === 'assistant'" :markdown="item.content" class="markdown-body" :themes="{ light: 'github-light', dark: 'github-dark' }" default-theme-mode="dark" />
@@ -276,6 +285,22 @@ watch(
 }
 
 :deep() {
+  
+/* 主回答默认大小，可按需调整 */
+.answer {
+  font-size: 1rem;   /* 16px 左右 */
+  color: #000;
+}
+
+/* 思考区域：浅灰色 + 小一号字 */
+.thinking {
+  font-size: 0.875rem; /* 14px，比主回答小一点 */
+  color: #9e9e9e;      /* 浅灰色 */
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
   .el-bubble-list {
     padding-top: 24px;
   }

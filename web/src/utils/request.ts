@@ -18,8 +18,7 @@ export const request = hookFetch.create<BaseResponse, 'data' | 'rows'>({
     'Content-Type': 'application/json',
   },
   // 后端uvicron，分隔符为\r\n
-  // sseTextDecoderPlugin源码：没开启json自动解析，或者开了json自动解析但JSON.parse失败（数据不是json格式），都不会做前缀移除了，这种情况需要调用方自己处理
-  plugins: [sseTextDecoderPlugin({ splitSeparator:'\r\n', json: false, prefix: 'data:', doneSymbol: '[DONE]' })], 
+  plugins: [sseTextDecoderPlugin({ splitSeparator:'\r\n', json: true, prefix: 'data:', doneSymbol: '[DONE]' })], 
 });
 
 export const request4File = hookFetch.create<BaseResponse, 'data' | 'rows'>({

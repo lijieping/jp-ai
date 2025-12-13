@@ -42,7 +42,7 @@ export const useChatStore = defineStore('chat', () => {
         typing: false,
         reasoning_content: thinkContent,
         thinkingStatus: 'end',
-        content: extractThkContentAfter(item.content as string),
+        content: isUser? item.content : parseContentSteps(item.content as string),
         thinlCollapse: false,
       };
     });
@@ -73,16 +73,20 @@ export const useChatStore = defineStore('chat', () => {
     return matchResult?.[1] ?? '';
   }
 
-  // 如果有 </think> 标签，则把 </think> 之后的 内容从 content 中返回
-  function extractThkContentAfter(content: string) {
-    if (!content.includes('</think>')) {
-      return content;
+  function parseContentSteps(content: string) {
+    const steps = JSON.parse(content) as any[]
+    let str = ''
+    for (const step of steps) {
+      const type = step['type']
+      if (type == 'tool_call') {
+        for (const toolCall of Object.values(step['tool_calls_dict'] as Record<string, any>[])){
+          str = "<h1 class='thinking'>" + str + '调用工具：' + toolCall.name + "</h1>" + '\n\n'
+        }
+      } else if (type == 'ai_content') {
+        str += step['ai_answer'] + '\n\n'
+      }
     }
-    const regex = /<\/think>(.*)/s;
-    const matchResult = content.match(regex);
-    // 把这些内容从 content 中移除
-    content = content.replace(regex, '');
-    return matchResult?.[1] ?? '';
+    return str;
   }
 
   return {

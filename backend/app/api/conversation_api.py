@@ -15,7 +15,7 @@ def message_post(request: Request, body: MsgCreate):
     #简单控制访客的请求量
     if request.state.user_id == SETTINGS.GUEST_USER_ID:
         if random.random() > SETTINGS.GUEST_CHAT_ALLOW_PROBABILITY:
-            raise HTTPException(status_code=403, detail="您的聊天次数超限，请登录或稍后再试")
+            raise HTTPException(status_code=401, detail="您的聊天次数超限，请登录或稍后再试")
     def generate():
         for delta in conversation_service.message_create(body):
             # print(delta, end="", flush=True)

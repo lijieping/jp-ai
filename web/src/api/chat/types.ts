@@ -155,7 +155,7 @@ export interface ChatMessageVo {
   /**
    * 消息内容
    */
-  content?: string;
+  content: string;
   /**
    * 扣除金额
    */
