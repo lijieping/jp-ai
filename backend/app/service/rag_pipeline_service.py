@@ -20,7 +20,6 @@ from app.infra.settings import SETTINGS
 from pathlib import Path
 from typing import List
 
-import easyocr
 from langchain_community.document_loaders import ( Docx2txtLoader, TextLoader, PyPDFLoader)
 
 
@@ -83,8 +82,6 @@ class _DataCleanHandler(Handler):
         "pdf": {"name": "pdf", "exts": {".pdf"}},
         "img": {"name": "图片", "exts": {".png", ".jpg", ".jpeg", ".bmp"}}
     }
-
-    _easyocr_reader = easyocr.Reader(["ch_sim"], False) # langlist里的语言如果本地没有对应模型，会触发下载
 
     def process(self, ctx: Context) -> None:
         path = Path(ctx.file_url)

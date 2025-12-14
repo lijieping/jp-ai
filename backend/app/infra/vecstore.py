@@ -2,7 +2,6 @@ import uuid
 from typing import Any, Iterable, List, Optional, Callable, Dict, Union
 
 import numpy as np
-from faiss import IndexFlatL2
 from langchain_chroma import Chroma
 from langchain_community.docstore import InMemoryDocstore
 from langchain_community.docstore.base import AddableMixin, Docstore
@@ -51,6 +50,8 @@ class _CUSTOM_FAISS(FAISS):
         embeddings: Iterable[List[float]] = self.embedding_function.embed_documents(texts)
         ids: Optional[List[str]] = kwargs.pop("ids", None)
         dim = len(embeddings[0])
+
+        from faiss import IndexFlatL2 # 此处import 防止chroma模式还要load faiss的IndexFlatL2
         self.index = IndexFlatL2(dim)
 
         faiss = dependable_faiss_import()

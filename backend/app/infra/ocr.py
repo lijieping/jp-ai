@@ -1,3 +1,4 @@
+import threading
 import time
 
 import easyocr
@@ -42,11 +43,18 @@ def buyan_ocr_parse(image_path:str):
         except json.JSONDecodeError:
             logger.debug("返回不是合法 JSON，原文：", resp.text)
 
-easyocr_reader = easyocr.Reader(["ch_sim"], False)
+_easyocr_reader = None
+_easyocr_reader_lock = threading.Lock()
 def easy_ocr_parse(image_path:str):
+    global _easyocr_reader
+    if _easyocr_reader is None:
+        with _easyocr_reader_lock:
+            if _easyocr_reader is None:# 关键：在锁内赋值，保证对其他线程可见
+                tmp = easyocr.Reader(["ch_sim"], False)
+                _easyocr_reader = tmp
 
     start = time.perf_counter_ns()  # 纳秒级起点
-    texts = easyocr_reader.readtext(image_path, detail=0)
+    texts = _easyocr_reader.readtext(image_path, detail=0)
     logger.debug("识别结果：")
     logger.debug(texts)
 
