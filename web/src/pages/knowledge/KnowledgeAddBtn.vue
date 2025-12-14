@@ -1,7 +1,7 @@
 <script lang="ts" setup>
-import { listAllBizSpaces, uploadFilesToBizSpace, getSupportedFileTypes } from '@/api/knowledge'
-import { onMounted, ref, defineEmits } from 'vue'
+import { uploadFilesToBizSpace, getSupportedFileTypes } from '@/api/knowledge'
 import type { BizSpaceVO } from '@/api/knowledge/types'
+import { onMounted, ref, defineEmits } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { UploadFilled, QuestionFilled } from '@element-plus/icons-vue'
 
@@ -10,8 +10,9 @@ import { UploadFilled, QuestionFilled } from '@element-plus/icons-vue'
  */
 const drawer = ref(false)
 
-// 业务空间相关数据
-const bizSpaces = ref<BizSpaceVO[]>([])
+
+const props = defineProps<{ bizSpaces: BizSpaceVO[]}>() // 父子组件共享业务空间列表
+const emit = defineEmits(['refreshFileList']) // 文件上传，触发刷新父子组件共享文件列表
 const selectedSpaceId = ref<number>(0) // 提供默认值0，避免undefined问题
 
 // 上传文件相关，使用any类型暂时绕过类型检查
@@ -26,21 +27,6 @@ interface FileTypeCategory {
 
 const supportedFileTypes = ref<Record<string, FileTypeCategory>>({}) // 修改为对象类型
 const uploadTip = ref<string>('加载中...') // 上传提示语
-
-// 加载业务空间列表
-const loadBizSpaces = async () => {
-    try {
-        const res = await listAllBizSpaces()
-        bizSpaces.value = res.data || []
-        // 如果有业务空间，默认选择第一个
-        if (bizSpaces.value.length > 0) {
-            selectedSpaceId.value = bizSpaces.value[0].id || 0 // 使用默认值0，避免undefined问题
-        }
-    } catch (error) {
-        console.error('获取业务空间列表失败:', error)
-        ElMessage.error('获取业务空间列表失败')
-    }
-}
 
 const handleClose = (done: () => void) => {
     ElMessageBox.confirm('将失去已填写内容，确定退出吗？')
@@ -75,11 +61,6 @@ const handleChange = (file: any, fileListParam: any) => {
     console.log('更新后文件列表:', fileListParam)
 }
 
-// 定义自定义事件
-const emit = defineEmits<{
-    'file-uploaded': []
-}>()
-
 // 提交表单
 async function onSubmit() {
     // 检查是否选择了业务空间
@@ -103,8 +84,8 @@ async function onSubmit() {
         await uploadFilesToBizSpace(selectedSpaceId.value, files, description.value)
 
         ElMessage.success('文件上传成功')
-        // 触发文件上传成功事件，通知父组件刷新表格
-        emit('file-uploaded')
+        // 触发文件变更事件，通知父组件刷新表格
+        emit('refreshFileList')
         drawer.value = false
         // 清空文件列表和描述
         fileList.value = []
@@ -153,7 +134,6 @@ const loadSupportedFileTypes = async () => {
 
 // 组件挂载时加载业务空间列表和支持的文件类型
 onMounted(() => {
-    loadBizSpaces()
     loadSupportedFileTypes()
 })
 </script>
@@ -164,8 +144,9 @@ onMounted(() => {
     <el-drawer v-model="drawer" :direction="'rtl'" :before-close="handleClose">
         <el-form label-width="auto" style="max-width: 600px">
             <el-form-item label="业务空间">
-                <el-select v-model="selectedSpaceId" placeholder="请选择业务空间" style="width: 240px" filterable>
-                    <el-option v-for="space in bizSpaces" :key="space.id || space.name" :label="space.name" :value="space.id || 0" />
+                <el-select v-model="selectedSpaceId" placeholder="请选择业务空间" style="width: 240px" clearable filterable>
+                    <el-option key="0" label="全部/请选择" :value="0" />
+                    <el-option v-for="space in bizSpaces" :key="space.id" :label="space.name" :value="space.id" />
                 </el-select>
             </el-form-item>
 
@@ -175,7 +156,7 @@ onMounted(() => {
             </el-form-item>
 
             <el-form-item label="文件">
-                <el-upload ref="uploadRef" v-model:file-list="fileList" class="upload-demo" drag multiple action=""
+                <el-upload ref="uploadRef" v-model:file-list="fileList" drag multiple action=""
                     :auto-upload="false" :on-change="handleChange">
                     <el-icon class="el-icon--upload"><upload-filled /></el-icon>
                     <div class="el-upload__text">

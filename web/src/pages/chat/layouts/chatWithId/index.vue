@@ -8,6 +8,7 @@ import { useHookFetch } from 'hook-fetch/vue';
 import { Sender } from 'vue-element-plus-x';
 import { useRoute } from 'vue-router';
 import { send } from '@/api';
+import type { ChatMessageVo } from '@/api/chat/types';
 
 // import FilesSelect from '@/components/FilesSelect/index.vue';
 // import ModelSelect from '@/components/ModelSelect/index.vue';
@@ -24,6 +25,8 @@ type MessageItem = BubbleProps & {
   role: 'user' | 'assistant';
   avatar: string;
   content: string;
+  thumbUp:boolean;
+  thumbDown:boolean;
 };
 
 const route = useRoute();
@@ -172,8 +175,10 @@ function addMessage(message: string, isUser: boolean) {
     isMarkdown: !isUser,
     loading: !isUser,
     typing: !isUser,
-    //noStyle: true,
-    content: message || ''
+    noStyle: !isUser,
+    content: message || '',
+    thumbUp:false,
+    thumbDown:false,
   };
   bubbleItems.value.push(obj);
 }
@@ -202,6 +207,20 @@ watch(
     }
   },
 );
+
+const copyAnswer = (item:ChatMessageVo) => {
+  const clean_content = item.content.replace(/<\/?span[^>]*>/gi, '')
+  navigator.clipboard.writeText(clean_content)
+  ElMessage.success('复制成功')
+}
+
+const thumbUpAnswer = (item:ChatMessageVo) => {
+  item.thumbUp = !item.thumbUp;
+}
+
+const thumbDownAnswer = (item:ChatMessageVo) => {
+  item.thumbDown = !item.thumbDown;
+}
 </script>
 
 <template>
@@ -213,9 +232,9 @@ watch(
             :status="item.thinkingStatus" class="thinking-chain-warp" @change="handleChange"
           />
         </template> -->
-        <template #header="{ item }">
+        <!-- <template #header="{ item }">
           <template  v-if="item.role=='assistant'"><span>小光</span></template>
-        </template>
+        </template> -->
         <template #content="{ item }">
           <!-- chat 内容走 markdown -->
           <XMarkdown v-if="item.content && item.role === 'assistant'" :markdown="item.content" class="markdown-body" :themes="{ light: 'github-light', dark: 'github-dark' }" default-theme-mode="dark" />
@@ -224,6 +243,25 @@ watch(
             {{ item.content }}
           </div>
         </template>
+        <template #footer="{ item }">
+        <div class="footer-container">
+          <el-tooltip content="点赞" placement="top">
+              <el-button v-if='item.role == "assistant"' :type="item.thumbUp ? 'primary' : 'default'"  size="small" circle  @click="thumbUpAnswer(item)">
+                <SvgIcon name="thumb_up" size="16" />
+              </el-button>
+          </el-tooltip>
+          <el-tooltip content="点踩" placement="top">
+            <el-button v-if='item.role == "assistant"' :type="item.thumbDown ? 'primary' : 'default'" size="small" circle  @click="thumbDownAnswer(item)">
+              <SvgIcon name="thumb_down" size="16" />
+            </el-button>
+          </el-tooltip>
+          <el-tooltip content="复制" placement="top" >
+            <el-button size="small" circle @click="copyAnswer(item)" >
+              <SvgIcon name="document_duplicate" size="16" />
+            </el-button>
+          </el-tooltip>
+        </div>
+    </template>
       </BubbleList>
 
       <Sender

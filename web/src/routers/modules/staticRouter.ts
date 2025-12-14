@@ -13,7 +13,7 @@ export const layoutRouter: RouteRecordRaw[] = [
         path: 'chat',
         name: 'chat-module',  // 模块节点，可以不要真实组件
         redirect: { name: 'chat' },
-        meta: { nameInMenu: '智能助手', icon: 'HomeFilled' },
+        meta: { nameInMenu: '智能助手', icon: 'Service' },
         children: [
           {
             path: '',         // 对应 /chat
@@ -41,7 +41,7 @@ export const layoutRouter: RouteRecordRaw[] = [
         path: 'knowledge-base',
         name: 'kb-module',
         redirect: { name: 'knowledge-base' },
-        meta: { nameInMenu: '知识库', icon: 'DocumentCopy' },
+        meta: { nameInMenu: '知识库', icon: 'Document' },
         children: [
           {
             path: '',         // 对应 /knowledge-base

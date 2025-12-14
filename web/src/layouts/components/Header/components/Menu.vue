@@ -1,9 +1,9 @@
 <script lang="ts" setup>
 import { layoutRouter } from '@/routers/modules/staticRouter'
 // 过滤出要显示的菜单
-const menuRouteRecords = layoutRouter.filter(r =>  r.children && r.children.length > 0).map(r => {
-  return r.children!.filter(c => c.meta && (c.meta as any).nameInMenu);
-}).flat();
+const menuRouteRecords = layoutRouter.filter(r =>  r.children && r.children.length > 0)
+                                  .map(r => r.children!.filter(c => c.meta && (c.meta as any).nameInMenu))
+                                  .flat();
 
 </script>
 
@@ -12,6 +12,7 @@ const menuRouteRecords = layoutRouter.filter(r =>  r.children && r.children.leng
     router
     mode="horizontal"
     :ellipsis="false"
+    :default-active="$route.path"
   >
     <template v-for="r in menuRouteRecords" :key="r.path">
       <el-menu-item :index="'/' + r.path">

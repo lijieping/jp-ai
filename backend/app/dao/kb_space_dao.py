@@ -31,13 +31,13 @@ class KbSpaceDAO:
             return db.query(KbSpace).filter(KbSpace.status==1).all()
     
     @staticmethod
-    def get_by_id(id: str):
+    def get_by_id(id: int) -> KbSpace:
         """根据ID获取知识库空间"""
         with DbSession() as db:
             return db.query(KbSpace).filter(KbSpace.id == id).first()
     
     @staticmethod
-    def update(id: str, **kwargs):
+    def update(id: int, **kwargs):
         """更新知识库空间信息"""
         with DbSession() as db:
             # 查找要更新的记录
@@ -50,5 +50,15 @@ class KbSpaceDAO:
                 if hasattr(kb_space, key):
                     setattr(kb_space, key, value)
             
+            db.commit()
+        return True
+
+    @staticmethod
+    def delete(id: int):
+        with DbSession() as db:
+            kb_space = db.query(KbSpace).filter(KbSpace.id == id).first()
+            if not kb_space:
+                return False
+            kb_space.status = 0
             db.commit()
         return True

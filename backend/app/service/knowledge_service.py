@@ -4,6 +4,7 @@ from pathlib import Path
 from fastapi import UploadFile
 
 from app.infra.files import local_file_save, local_file_delete
+from app.infra.log import logger
 from app.schemas.page_schema import Page
 
 from app.dao.kb_space_dao import KbSpaceDAO
@@ -11,6 +12,8 @@ from app.dao.kb_file_dao import KbFileDAO
 from app.dao.user_dao import UserDAO
 from app.schemas.kb_space_schema import KbSpaceOut, KbSpaceIn
 from app.schemas.kb_file_schema import KbFileWithPipelineRecordOut, KbFileOut
+
+from app.service import rag_pipeline_service
 
 
 def space_create(name:str, desc:str, vector_db_collection:str):
@@ -31,7 +34,7 @@ def space_list_all() -> List[KbSpaceOut]:
         for space in kb_spaces
     ]
 
-def kb_space_get_by_id(id: str) -> Optional[KbSpaceOut]:
+def space_get_by_id(id: str) -> Optional[KbSpaceOut]:
     """根据ID获取知识库空间，返回KbSpaceOut对象"""
     space = KbSpaceDAO.get_by_id(id)
     if space:
@@ -43,7 +46,19 @@ def kb_space_get_by_id(id: str) -> Optional[KbSpaceOut]:
         )
     return None
 
-def kb_space_update(id: str, kb_space_in: KbSpaceIn) -> bool:
+def space_delete(space_id: int) -> bool:
+    """删除知识库空间"""
+    # 检查空间是否存在
+    space = KbSpaceDAO.get_by_id(space_id)
+    if not space:
+        raise ValueError(f"知识库空间ID {space_id} 不存在")
+    
+    # 删除空间下所有文件
+    file_delete_by_space_id(space_id)   
+    # 删除空间（DAO层会处理关联文件的级联删除）
+    return KbSpaceDAO.delete(space_id)
+
+def space_update(id: int, kb_space_in: KbSpaceIn) -> bool:
     """更新知识库空间信息，接受KbSpaceIn对象"""
     # 将KbSpaceIn对象转换为字典，注意字段映射
     update_data = {
@@ -53,11 +68,21 @@ def kb_space_update(id: str, kb_space_in: KbSpaceIn) -> bool:
     }
     return KbSpaceDAO.update(id, **update_data)
 
-def file_upload(space_id: int, file_datas:List[UploadFile], user_id: int, description: str = "") -> Dict[str, Any]:
+def file_upload(space_id: int, file_datas:List[UploadFile], user_id: int, description: str = ""):
     # 验证知识库空间是否存在
     space = KbSpaceDAO.get_by_id(space_id)
     if not space:
         raise ValueError(f"知识库空间ID {space_id} 不存在")
+
+    support_exts = rag_pipeline_service.get_support_ext_set()
+    invalid_exts = set()
+    for file_data in file_datas:
+        # 检查文件扩展名是否被支持
+        file_extension = Path(file_data.filename).suffix.lower()
+        if file_extension not in support_exts:
+            invalid_exts.add(file_extension)
+    if len(invalid_exts) > 0:
+        raise ValueError(f"rag不支持的文件类型：: {invalid_exts}")
 
     for file_data in file_datas:
         # 提取文件信息
@@ -78,10 +103,9 @@ def file_upload(space_id: int, file_datas:List[UploadFile], user_id: int, descri
             user_id=user_id,
             file_url=file_url
         )
-    # 返回上传结果
-    return {
-        "message": "文件上传成功",
-    }
+
+        rag_pipeline_service.submit(file_url, space.vector_db_collection)
+
 
 def file_get_by_id(id: int) -> Optional[KbFileOut]:
 
@@ -113,6 +137,20 @@ def file_delete(id: int) -> Optional[bool]:
     file = KbFileDAO.get_by_id(id)
     local_file_delete(file.file_url)
     return KbFileDAO.delete(id)
+
+def file_delete_by_space_id(space_id: int) -> bool:
+    files = KbFileDAO.list_by_space_id(space_id, None)
+    if not files:
+        return True 
+    for file in files:
+        if file.file_url:
+            try:
+                local_file_delete(file.file_url)
+            except Exception as e:
+                logger.warning("删除文件失败: %s, 错误: %s", file.file_url, e)
+                pass
+    return KbFileDAO.delete_by_space_id(space_id) > 0
+
 
 def file_with_rag_info_list(space_id: int = 0, page_size: int = 10, cur_page: int = 1) -> Page[KbFileWithPipelineRecordOut]:
     # 参数验证

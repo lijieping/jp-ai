@@ -3,9 +3,8 @@ from typing import List
 
 from fastapi import APIRouter, File, UploadFile, Path, Request, Form
 
-from app.api.api_response import R, Code
+from app.api.api_response import R
 from app.infra.log import logger
-from app.schemas.rag_schema import RagPipelineRequest
 from app.service import knowledge_service, rag_pipeline_service
 from app.schemas.kb_space_schema import KbSpaceIn
 
@@ -22,6 +21,45 @@ def space_list_all():
     """获取所有知识库空间列表的接口"""
     kb_spaces = knowledge_service.space_list_all()
     return R.ok(kb_spaces)
+
+@router.get("/space/{space_id}", summary="获取业务空间详情")
+def space_get_by_id(space_id: int = Path(..., description="业务空间ID")):
+    """根据ID获取单个业务空间详情"""
+    try:
+        space = knowledge_service.space_get_by_id(space_id)
+        return R.ok(space)
+    except ValueError as e:
+        return R.fail(str(e))
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        return R.fail(msg = "获取业务空间失败")
+
+@router.delete("/space/{space_id}", summary="删除业务空间")
+def space_delete(space_id: int = Path(..., description="业务空间ID")):
+    """删除指定ID的业务空间"""
+    try:
+        knowledge_service.space_delete(space_id)
+        return R.ok(msg="业务空间删除成功")
+    except ValueError as e:
+        return R.fail(msg = str(e))
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        return R.fail(msg = "删除业务空间失败")
+
+@router.put("/space/{space_id}", summary="更新业务空间信息")
+def space_update(
+    body:KbSpaceIn,
+    space_id: int = Path(..., description="业务空间ID")
+):
+    """更新指定业务空间的信息"""
+    try:
+        knowledge_service.space_update(space_id, body)
+        return R.ok(msg="业务空间更新成功")
+    except ValueError as e:
+        return R.fail(str(e))
+    except Exception as e:
+        logger.error(traceback.format_exc())
+        return R.fail("更新业务空间失败")
 
 @router.post("/space/{space_id}/file", summary="上传文件到知识库空间")
 def file_upload(
@@ -71,20 +109,3 @@ def file_delete(file_id: int = Path(..., description="文件id")):
 @router.get("/rag/pipeline/file-types", summary="获取rag支持的文件类型")
 def rag_file_type_lists():
     return R.ok(rag_pipeline_service.get_support_exts())
-
-@router.post("/rag/pipeline/execute", summary="获取支持的文件类型")
-def rag_pipeline_exec(body:RagPipelineRequest):
-    file_schema = knowledge_service.file_get_by_id(body.file_id)
-    # 检查文件扩展名是否被支持
-    support_exts = rag_pipeline_service.get_support_exts()
-    is_supported = False
-    for category in support_exts.values():
-        if file_schema.file_type in category["exts"]:
-            is_supported = True
-            break
-    
-    if not is_supported:
-        return R.fail(code = Code.PARAM_ERR.value, msg = f"不支持的文件类型: {file_schema.file_type}")
-    
-    rag_pipeline_service.submit(file_schema.file_url, file_schema.collection)
-    return R.ok(msg = "提交成功，后续观察文件的流水线状态")

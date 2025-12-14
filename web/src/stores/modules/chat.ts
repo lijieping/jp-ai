@@ -44,6 +44,9 @@ export const useChatStore = defineStore('chat', () => {
         thinkingStatus: 'end',
         content: isUser? item.content : parseContentSteps(item.content as string),
         thinlCollapse: false,
+        noStyle: !isUser,
+        thumbUp:false,
+        thumbDown:false,
       };
     });
   };
@@ -80,7 +83,7 @@ export const useChatStore = defineStore('chat', () => {
       const type = step['type']
       if (type == 'tool_call') {
         for (const toolCall of Object.values(step['tool_calls_dict'] as Record<string, any>[])){
-          str = "<h1 class='thinking'>" + str + '调用工具：' + toolCall.name + "</h1>" + '\n\n'
+          str = "<span class='thinking'>" + str + '调用工具：' + toolCall.name + "</span>" + '\n\n'
         }
       } else if (type == 'ai_content') {
         str += step['ai_answer'] + '\n\n'

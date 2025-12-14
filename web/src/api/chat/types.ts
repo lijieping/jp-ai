@@ -188,4 +188,8 @@ export interface ChatMessageVo {
    * 用户id
    */
   userId?: number;
+
+  thumbUp:boolean;
+
+  thumbDown:boolean;
 }

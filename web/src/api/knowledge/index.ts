@@ -17,8 +17,8 @@ export function getBizSpaceById(id: number) {
 }
 
 // 更新业务空间
-export function updateBizSpace(id: number, data: Partial<BizSpaceVO>) {
-  return put(`/kb/space/${id}`, data).json();
+export function updateBizSpace(data: BizSpaceVO) {
+  return put(`/kb/space/${data.id}`, data).json();
 }
 
 // 上传文件到业务空间
@@ -48,11 +48,6 @@ export function getKnowledgeFileList(params:KnowledgeFileParams) {
   return get<KnowledgeFileVO[]>(`/kb/file/list`, params).json();
 }
 
-// 执行RAG检索
-export function executeRagRetrieve(data: { file_id: number }) {
-  return post(`/kb/rag/pipeline/execute`, data).json();
-}
-
 // 获取rag支持的文件类型
 export function getSupportedFileTypes() {
   return get<string[]>('/kb/rag/pipeline/file-types').json();
@@ -61,4 +56,9 @@ export function getSupportedFileTypes() {
 // 删除文件
 export function deleteKnowledgeFile(fileId: number) {
   return del(`/kb/file/${fileId}`).json();
+}
+
+// 删除业务空间
+export function deleteBizSpace(id: number) {
+  return del(`/kb/space/${id}`).json();
 }

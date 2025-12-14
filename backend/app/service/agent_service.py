@@ -214,4 +214,6 @@ def initialize_agent():
         checkpointer=HybridCheckpointSaver(), # 每次新建一个，防止mysql连接丢失
     )
 
+    _agent_instance.get_graph(xray=True).print_ascii()
+
     return _agent_instance

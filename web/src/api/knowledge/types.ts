@@ -1,5 +1,5 @@
 export interface BizSpaceVO {
-  id?: number;
+  id: number;
   name: string;
   collection: string;
   desc: string;

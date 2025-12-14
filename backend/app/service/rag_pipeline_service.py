@@ -159,6 +159,9 @@ def submit(file_url: str, collection_name:str) -> None:
 def get_support_exts() -> dict:
     return _DataCleanHandler._support_exts.copy()
 
+def get_support_ext_set() -> set:
+    return  set().union(*(v['exts'] for v in _DataCleanHandler._support_exts.values()))
+
 
 
 

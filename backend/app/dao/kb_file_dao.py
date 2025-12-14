@@ -145,3 +145,23 @@ class KbFileDAO:
     @staticmethod
     def delete(id: int) -> bool:
         return KbFileDAO.update(id, status=0)
+
+    @staticmethod
+    def list_by_space_id(space_id: int, status: Optional[int] = None) -> List[KbFile]:
+        """根据 space_id 查询文件列表"""
+        with DbSession() as db:
+            query = db.query(KbFile).filter(KbFile.space_id == space_id)
+            if status is not None:
+                query = query.filter(KbFile.status == status)
+            return query.order_by(KbFile.created_at.desc()).all()
+
+    @staticmethod
+    def delete_by_space_id(space_id: int) -> int:
+        with DbSession() as db:
+            updated_rows = (
+                db.query(KbFile)
+                .filter(KbFile.space_id == space_id, KbFile.status == 1)
+                .update({"status": 0}, synchronize_session=False)
+            )
+            db.commit()
+        return updated_rows

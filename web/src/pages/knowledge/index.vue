@@ -2,8 +2,7 @@
 <script setup lang="ts">
 import BizMgrBtn from '@/pages/knowledge/BizMgrBtn.vue'
 import KnowledgeAddBtn from '@/pages/knowledge/KnowledgeAddBtn.vue'
-import type { TableInstance } from 'element-plus'
-import { listAllBizSpaces, getKnowledgeFileList, executeRagRetrieve, deleteKnowledgeFile } from '@/api/knowledge'
+import { listAllBizSpaces, getKnowledgeFileList, deleteKnowledgeFile } from '@/api/knowledge'
 import type { BizSpaceVO, KnowledgeFileVO, KnowledgeFileParams } from '@/api/knowledge/types'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { onMounted, reactive, ref } from 'vue'
@@ -27,7 +26,6 @@ const selectedSpaceId = ref<number>(0)
 // 表格数据相关
 const tableData = ref<KnowledgeFileVO[]>([])
 const tableLoading = ref(false)
-const tableRef = ref<TableInstance>()
 
 // 分页相关数据
 const currentPage = ref(1)
@@ -46,10 +44,6 @@ const loadBizSpaces = async () => {
   try {
     const res = await listAllBizSpaces()
     bizSpaces.value = res.data || []
-    // 如果有业务空间，默认选择第一个
-    if (bizSpaces.value.length > 0) {
-      selectedSpaceId.value = bizSpaces.value[0].id || 0 // 使用默认值0，避免undefined问题
-    }
   } catch (error) {
     console.error('获取业务空间列表失败:', error)
     ElMessage.error('获取业务空间列表失败')
@@ -100,47 +94,6 @@ const handleQuery = () => {
   currentPage.value = 1
   loadKnowledgeFiles()
 }
-
-// 重置过滤条件
-const clearFilter = () => {
-  tableRef.value!.clearFilter()
-}
-
-// 检索操作
-const handleRetrieve = async (_: any, row: KnowledgeFileVO) => {
-  try {
-    // 显示确认框
-    await ElMessageBox.confirm('确定要对该文件执行RAG检索吗？', '操作确认', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
-    // 调用API执行RAG检索
-    const rspBody = await executeRagRetrieve({ file_id: row.id! })
-    
-    if (rspBody.code === 200000) {
-      ElMessage.success(rspBody.msg || 'RAG检索已成功执行')
-    } else {
-      ElMessage.error(rspBody.msg || 'RAG检索执行失败')
-    }
-  } catch (error: any) {
-    // 如果用户取消操作，不显示错误消息
-    if (error.name !== 'Cancel') {
-      if (error === 'cancel' || error?.action === 'cancel') {
-        console.log('用户取消了RAG检索操作')
-      } else {
-        // 其他错误（比如网络错误）
-        console.error('RAG检索出错:', error)
-        ElMessage.error('操作失败，请稍后重试')
-      }
-    }
-  }
-}
-
-// 编辑操作（暂时未使用）
-// const handleEdit = (_, row: KnowledgeFileVO) => {
-//   console.log(row)
-// }
 
 // 删除操作
 const handleDelete = async (_: any, row: KnowledgeFileVO) => {
@@ -193,12 +146,10 @@ onMounted(() => {
         <el-col :span="18">
           <el-form :inline="true" :model="formInline" style="margin-bottom: -22px;">
             <el-form-item label="业务空间">
-              <el-select v-model="selectedSpaceId" placeholder="请选择业务空间" style="width: 240px" filterable>
-                <el-option v-for="space in bizSpaces" :key="space.id || space.name" :label="space.name" :value="space.id || 0" />
+              <el-select v-model="selectedSpaceId" placeholder="请选择业务空间" style="width: 240px" clearable filterable>
+                <el-option key="0" label="全部/请选择" :value="0" />
+                <el-option v-for="space in bizSpaces" :key="space.id" :label="space.name" :value="space.id" />
               </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button @click="clearFilter">重置过滤</el-button>
             </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="handleQuery">查询</el-button>
@@ -207,8 +158,8 @@ onMounted(() => {
         </el-col>
         <el-col :span="6" style="display: flex; justify-content: flex-end;">
            <!-- 在KnowledgeAddBtn组件上添加事件监听器 -->
-          <KnowledgeAddBtn @file-uploaded="loadKnowledgeFiles" />
-          <BizMgrBtn />
+          <KnowledgeAddBtn @refreshFileList="loadKnowledgeFiles" v-model:bizSpaces="bizSpaces"/>
+          <BizMgrBtn v-model:bizSpaces="bizSpaces" @bizSpacesRefresh="loadBizSpaces" @refreshFileList="loadKnowledgeFiles"/>
         </el-col>
       </el-row>
     </el-header>
@@ -222,12 +173,12 @@ onMounted(() => {
             {{ (row.file_size / 1024).toFixed(2) }} KB
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="文件描述" min-width="200">
+        <el-table-column prop="description" label="描述" min-width="170">
           <template #default="{ row }">
             {{ row.description || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="space_name" label="业务空间" width="120" />
+        <el-table-column prop="space_name" label="业务空间" width="150" />
         <el-table-column prop="user_name" label="上传用户" width="100" />
         <el-table-column prop="created_at" label="上传时间" width="180" />
         <el-table-column prop="status" label="文件状态" width="100">
@@ -259,12 +210,6 @@ onMounted(() => {
         </el-table-column>
         <el-table-column label="操作" width="240">
           <template #default="{ row, $index }">
-            <el-button size="small" @click="handleRetrieve($index, row)">
-              RAG检索
-            </el-button>
-            <!-- <el-button size="small" @click="handleEdit($index, row)">
-              编辑
-            </el-button> -->
             <el-button size="small" type="danger" @click="handleDelete($index, row)">
               删除
             </el-button>
