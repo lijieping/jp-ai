@@ -115,7 +115,7 @@ const handleDelete = async (id: number) => {
     <el-button size="small" type="primary" @click="editDrawer = true">
       新建
     </el-button>
-    <el-table :data="bizSpaces" style="width: 100%" cell-class-name="word-break-cell">
+    <el-table :data="props.bizSpaces" style="width: 100%" cell-class-name="word-break-cell">
       <!-- 修复列名和字段映射，使其与BizSpaceVO结构匹配 -->
       <el-table-column prop="name" label="业务名" width="100" />
       <el-table-column prop="collection" label="向量库集合" width="100" />

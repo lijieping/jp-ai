@@ -146,7 +146,7 @@ onMounted(() => {
             <el-form-item label="业务空间">
                 <el-select v-model="selectedSpaceId" placeholder="请选择业务空间" style="width: 240px" clearable filterable>
                     <el-option key="0" label="全部/请选择" :value="0" />
-                    <el-option v-for="space in bizSpaces" :key="space.id" :label="space.name" :value="space.id" />
+                    <el-option v-for="space in props.bizSpaces" :key="space.id" :label="space.name" :value="space.id" />
                 </el-select>
             </el-form-item>
 
