@@ -41,7 +41,7 @@ def small_model_service(question: str) -> str:
 
 def token_generator(question: str, conversation_id: str):
     # 配置对话id，用于记忆对话上下文
-    config = {"configurable": {"thread_id": conversation_id}}
+    config = RunnableConfig(configurable={"thread_id": conversation_id})
     agent = initialize_agent()
     with ls.tracing_context(enabled=True, project_name="jp-ai"):
         for token, metadata in agent.stream(
@@ -195,23 +195,30 @@ def init_memory_pattern_middlewares() -> list:
     return [summarization_middleware, trim_messages]
 
 
-def initialize_agent():
-    main_model = init_main_model()
-    system_prompt = init_sys_prompt()
-    # TODO 结构化输出
-
-    middleware = []
-    middleware.extend(init_memory_pattern_middlewares())
-
-    tools = asyncio.run(build_tools())
-
+def initialize_agent(
+        model: BaseChatModel = None,
+        system_prompt:str = None,
+        tools:list = None,
+        middlewares:list = None,
+        checkpointer:BaseCheckpointSaver = None
+):
+    if model is None:
+        model = init_main_model()
+    if system_prompt is None:
+        system_prompt:str = init_sys_prompt()
+    if tools is None:
+        tools = asyncio.run(build_tools())
+    if middlewares is None:
+        middlewares = init_memory_pattern_middlewares()
+    if checkpointer is None:
+        checkpointer = HybridCheckpointSaver()
     # LangChain 1.0 中构建智能体的标准方式
     _agent_instance = create_agent(
-        model=main_model,
+        model=model,
         tools=tools,
-        middleware=middleware,
+        middleware=middlewares,
         system_prompt=system_prompt,
-        checkpointer=HybridCheckpointSaver(), # 每次新建一个，防止mysql连接丢失
+        checkpointer=checkpointer, # 每次新建一个，防止mysql连接丢失
     )
 
     _agent_instance.get_graph(xray=True).print_ascii()

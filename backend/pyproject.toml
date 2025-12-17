@@ -34,6 +34,13 @@ dependencies = [
     "grandalf>=0.8",
 ]
 
+[project.optional-dependencies]
+eval = [
+    "datasets==4.4.1",
+    "ragas==0.4.1",
+    "langchain-ollama==1.0.0"
+]
+
 [tool.uv]
 index-strategy = "unsafe-best-match"
 
