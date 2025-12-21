@@ -1,7 +1,5 @@
-import threading
 import time
 
-import easyocr
 import requests
 import json
 
@@ -12,8 +10,6 @@ def ocr_parse(image_path:str):
     settings = get_settings()
     if settings.OCR_MODE == "buyan":
         return buyan_ocr_parse(image_path)
-    elif settings.OCR_MODE == "easyocr":
-        return ocr_parse(image_path)
     else:
         raise ValueError(f"非法的SETTINGS.OCR_MODE={settings.OCR_MODE}")
 
@@ -43,22 +39,3 @@ def buyan_ocr_parse(image_path:str):
             logger.debug("请求失败：", e)
         except json.JSONDecodeError:
             logger.debug("返回不是合法 JSON，原文：", resp.text)
-
-_easyocr_reader = None
-_easyocr_reader_lock = threading.Lock()
-def easy_ocr_parse(image_path:str):
-    global _easyocr_reader
-    if _easyocr_reader is None:
-        with _easyocr_reader_lock:
-            if _easyocr_reader is None:# 关键：在锁内赋值，保证对其他线程可见
-                tmp = easyocr.Reader(["ch_sim"], False)
-                _easyocr_reader = tmp
-
-    start = time.perf_counter_ns()  # 纳秒级起点
-    texts = _easyocr_reader.readtext(image_path, detail=0)
-    logger.debug("识别结果：")
-    logger.debug(texts)
-
-    elapsed_ms = (time.perf_counter_ns() - start) / 1e6
-    logger.debug(f"easy ocr耗时 {elapsed_ms:.2f} ms")
-    return texts

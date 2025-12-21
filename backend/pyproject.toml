@@ -8,9 +8,6 @@ dependencies = [
     "beautifulsoup4==4.14.3", # HTML/XML标签解析
     "dashscope==1.25.1", # 百炼sdk
     "docx2txt==0.9",
-    "easyocr==1.7.2", # 图片文字识别
-    "torch==2.9.1+cpu", # easyocr依赖torch，torch用cpu版，避免linux/容器安装cuda
-    "torchvision==0.24.1+cpu",
     "faiss-cpu==1.13.0", # 向量数据库
     "fastapi==0.121.3",
     "fastembed==0.7.3", #内置embedding模型
@@ -47,15 +44,6 @@ eval = [
 
 [tool.uv]
 index-strategy = "unsafe-best-match"
-
-[tool.uv.sources]
-# 核心配置：只为torch包指定阿里云源，其他包（包括其依赖）会按索引顺序查找
-torch = [{ index = "pytorch-cpu" }]
-
-[[tool.uv.index]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-priority = "explicit"
 
 [[tool.uv.index]]
 name = "tsinghua"

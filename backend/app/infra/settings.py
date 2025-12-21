@@ -46,8 +46,6 @@ class _Settings(BaseSettings):
     chroma_http_max_keepalive_connections: int = 5
     # ocr选项
     OCR_MODE:str="buyan" # buyan/easyocr
-    # EasyOCR模型存放目录
-    EASYOCR_MODULE_PATH: str
     # embedding选项
     MODEL_BGE_SMALL_EN_V15_STORE_PATH: str
 
