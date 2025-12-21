@@ -11,12 +11,12 @@ import langchain_text_splitters
 from langchain_core.documents import Document
 from langchain_excel_loader import StructuredExcelLoader
 
-from app.dao.rag_pipeline_record import RagPipelineRecordDAO
+from app.dao.rag_pipeline_record import rag_pipeline_record_dao, RagPipelineRecordDAO
 from app.infra import embd
 from app.infra.log import logger
 from app.infra.ocr import ocr_parse
 from app.infra.vecstore import get_faiss, get_chroma
-from app.infra.settings import SETTINGS
+from app.infra.settings import get_settings
 from pathlib import Path
 from typing import List
 
@@ -40,6 +40,10 @@ class Context:
 # 抽象处理者
 class Handler(ABC):
     _next: Optional["Handler"] = None
+    _rag_pipeline_record_dao: rag_pipeline_record_dao.__class__
+
+    def __init__(self):
+        self._rag_pipeline_record_dao = rag_pipeline_record_dao
 
     def set_next(self, handler: "Handler") -> "Handler":
         self._next = handler
@@ -61,15 +65,14 @@ class Handler(ABC):
         else:
             # 更新状态记录
             status = 2 if ctx.success else 3
-            RagPipelineRecordDAO.update(record_id=ctx.record_id, status=status, msg=ctx.message)
+            self._rag_pipeline_record_dao.update(record_id=ctx.record_id, status=status, msg=ctx.message)
 
     @abstractmethod
     def process(self, ctx: Context) -> None:
         raise NotImplementedError
 
-
 # 具体处理者
-class _DataCleanHandler(Handler):
+class FileParseHandler(Handler):
     """todo 版式还原、跨页表格合并、代码语法树解析：
         Unstructured质量更高，且自带版面还原，页脚去除等，但需要安装各种模型，比较重
     """
@@ -91,19 +94,14 @@ class _DataCleanHandler(Handler):
         ctx.ext = path.suffix
         if ctx.ext in self._support_exts["text"]["exts"]:
             ctx.pages = TextLoader(ctx.file_url).load()
-        # elif ctx.ext == ".csv":
-        #     ctx.docs = UnstructuredCSVLoader(ctx.file_url).load()
         elif ctx.ext in self._support_exts["excel"]["exts"]:
             ctx.pages = StructuredExcelLoader(ctx.file_url).load()
         elif ctx.ext in self._support_exts["word"]["exts"]:
             # ctx.docs = UnstructuredWordDocumentLoader(ctx.file_url).load()
             ctx.pages = Docx2txtLoader(ctx.file_url).load()
-        # elif ctx.ext == ".pptx":
-        #     ctx.docs = UnstructuredPowerPointLoader(ctx.file_url).load()
         elif ctx.ext in self._support_exts["pdf"]["exts"]:
             # 文字部分
             ctx.pages = PyPDFLoader(ctx.file_url).load()
-            # todo 图片部分， 拿到图的位置并ocr，把ocr结果按位置插入到文字中， 或者直接上unstructure
         # 3. 纯图片格式
         elif ctx.ext in self._support_exts["img"]["exts"]:
             texts = ocr_parse(ctx.file_url)
@@ -112,7 +110,7 @@ class _DataCleanHandler(Handler):
         else:
             raise ValueError(f"unsupported ext: {ctx.ext}")
 
-class _ChunkHandler(Handler):
+class ChunkHandler(Handler):
     """ todo 语意分块 """
     _text_splitter = langchain_text_splitters.RecursiveCharacterTextSplitter(
         separators=["\n\n", "\n", ".", " ", ""],
@@ -121,43 +119,45 @@ class _ChunkHandler(Handler):
         length_function=len
     )
     def process(self, ctx: Context) -> None:
-        ctx.chunks = _ChunkHandler._text_splitter.split_documents(ctx.pages)
+        ctx.chunks = ChunkHandler._text_splitter.split_documents(ctx.pages)
 
 
-class _EmbedAStoreHandler(Handler):
+class EmbedAStoreHandler(Handler):
     def process(self, ctx: Context) -> None:
         embedding_func = embd.embed
         texts = [doc.page_content for doc in ctx.chunks]
-        if SETTINGS.VECTOR_STORE_MODE == "faiss":
+        if get_settings().VECTOR_STORE_MODE == "faiss":
             vector_store = get_faiss(embedding_func, collection_name=ctx.collection_name)
             vector_store.add_documents(documents=ctx.chunks)
         else:
             vector_store = get_chroma(embedding_func, collection_name=ctx.collection_name)
             vector_store.add_texts(texts)
 
-# 模块级单例
-_chain_head : Final[Handler] = _DataCleanHandler()
-_chain_head.set_next(_ChunkHandler()).set_next(_EmbedAStoreHandler())
+class RagPipelineService:
+    def __init__(self, rag_pipeline_record_dao: RagPipelineRecordDAO):
+        self._rag_pipeline_record_dao = rag_pipeline_record_dao
+        # 模块级单例
+        self._chain_head: Final[Handler] = FileParseHandler()
+        self._chain_head.set_next(ChunkHandler()).set_next(EmbedAStoreHandler())
+        # 线程池
+        self._executor: Final[ThreadPoolExecutor] = ThreadPoolExecutor(
+            max_workers=2, thread_name_prefix="RAG-Chain"
+        )
 
-# 线程池
-_executor: Final[ThreadPoolExecutor] = ThreadPoolExecutor(
-    max_workers=2, thread_name_prefix="RAG-Chain"
-)
+    def submit(self, file_url: str, collection_name:str) -> None:
+        """非阻塞提交：把整条链当成一个 Task 扔进线程池"""
+        record_id = self._rag_pipeline_record_dao.create(file_url, 1, 1, None)
+        ctx = Context(file_url=file_url, collection_name=collection_name, record_id=record_id)
+        self._executor.submit(self._chain_head.handle, ctx)
 
-# 对外部暴露的接口
-# 1、流水线开始处理文件
-def submit(file_url: str, collection_name:str) -> None:
-    """非阻塞提交：把整条链当成一个 Task 扔进线程池"""
-    record_id = RagPipelineRecordDAO.create(file_url, 1, 1, None)
-    ctx = Context(file_url=file_url, collection_name=collection_name, record_id=record_id)
-    _executor.submit(_chain_head.handle, ctx)
+    def get_support_exts(self) -> dict:
+        return FileParseHandler._support_exts.copy()
 
-# 2、查询支持的文件类型
-def get_support_exts() -> dict:
-    return _DataCleanHandler._support_exts.copy()
+    def get_support_ext_set(self) -> set:
+        return set().union(*(v['exts'] for v in FileParseHandler._support_exts.values()))
 
-def get_support_ext_set() -> set:
-    return  set().union(*(v['exts'] for v in _DataCleanHandler._support_exts.values()))
+# 创建全局实例
+rag_pipeline_service = RagPipelineService(rag_pipeline_record_dao)
 
 
 

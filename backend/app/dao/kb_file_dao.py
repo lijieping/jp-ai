@@ -1,10 +1,9 @@
 from sqlalchemy import func, Column, String, DateTime, SmallInteger, BigInteger, Text, Index, CHAR
-from app.infra.mysql import Base, DbSession
+from app.infra.mysql import mysql_manager as global_mysql_manager
 from typing import List, Optional, Tuple
 from app.dao.rag_pipeline_record import RagPipelineRecord
 
-
-class KbFile(Base):
+class KbFile(global_mysql_manager.Base):
     __tablename__ = "kb_file"
 
     # 主键
@@ -39,12 +38,13 @@ class KbFile(Base):
         Index('idx_status', 'status'),
     )
 
-
 class KbFileDAO:
     """知识库文档数据访问对象"""
+    def __init__(self, mysql_manager=None):
+        self._mysql_manager = mysql_manager or global_mysql_manager
 
-    @staticmethod
     def create(
+            self,
             space_id: int,
             title: str,
             file_name: str,
@@ -55,7 +55,10 @@ class KbFileDAO:
             file_url: Optional[str] = None,
             description: Optional[str] = None
     ) -> int:
-        with DbSession() as db:
+        with self._mysql_manager.DbSession() as db:
+            # 确保表已创建
+            self._mysql_manager.Base.metadata.create_all(bind=self._mysql_manager.engine)
+
             kb_file = KbFile(
                 space_id=space_id,
                 title=title,
@@ -72,15 +75,16 @@ class KbFileDAO:
             db.refresh(kb_file)
         return kb_file.id
 
-    @staticmethod
-    def get_by_id(id: int) -> Optional[KbFile]:
-        with DbSession() as db:
+    def get_by_id(self, id: int) -> Optional[KbFile]:
+        with self._mysql_manager.DbSession() as db:
             return db.query(KbFile).filter(KbFile.id == id).first()
 
-    @staticmethod
-    def list_by_query_with_rag_status(space_id: int, offset: int, limit: int, status: Optional[int] = 1) -> List[
+    def list_by_query_with_rag_status(self, space_id: int, offset: int, limit: int, status: Optional[int] = 1) -> List[
         Tuple[KbFile, Optional[RagPipelineRecord]]]:
-        with DbSession() as db:
+        with self._mysql_manager.DbSession() as db:
+            # 确保表已创建
+            self._mysql_manager.Base.metadata.create_all(bind=self._mysql_manager.engine)
+
             # 子查询：获取每个文件最新的pipeline记录
             latest_pipeline_subq = (
                 db.query(
@@ -114,9 +118,11 @@ class KbFileDAO:
                 query = query.filter(KbFile.status == status)
             return query.order_by(KbFile.created_at.desc()).offset(offset).limit(limit).all()
 
-    @staticmethod
-    def count(space_id: int, status: Optional[int] = 1) -> int:
-        with DbSession() as db:
+    def count(self, space_id: int, status: Optional[int] = 1) -> int:
+        with self._mysql_manager.DbSession() as db:
+            # 确保表已创建
+            self._mysql_manager.Base.metadata.create_all(bind=self._mysql_manager.engine)
+
             query = db.query(KbFile)
 
             if space_id > 0:
@@ -127,9 +133,11 @@ class KbFileDAO:
             # 简单的count
             return query.count()
 
-    @staticmethod
-    def update(id: int, **kwargs) -> bool:
-        with DbSession() as db:
+    def update(self, id: int, **kwargs) -> bool:
+        with self._mysql_manager.DbSession() as db:
+            # 确保表已创建
+            self._mysql_manager.Base.metadata.create_all(bind=self._mysql_manager.engine)
+
             kb_file = db.query(KbFile).filter(KbFile.id == id).first()
             if not kb_file:
                 return False
@@ -142,22 +150,25 @@ class KbFileDAO:
             db.commit()
         return True
 
-    @staticmethod
-    def delete(id: int) -> bool:
-        return KbFileDAO.update(id, status=0)
+    def delete(self, id: int) -> bool:
+        return self.update(id, status=0)
 
-    @staticmethod
-    def list_by_space_id(space_id: int, status: Optional[int] = None) -> List[KbFile]:
+    def list_by_space_id(self, space_id: int, status: Optional[int] = None) -> List[KbFile]:
         """根据 space_id 查询文件列表"""
-        with DbSession() as db:
+        with self._mysql_manager.DbSession() as db:
+            # 确保表已创建
+            self._mysql_manager.Base.metadata.create_all(bind=self._mysql_manager.engine)
+
             query = db.query(KbFile).filter(KbFile.space_id == space_id)
             if status is not None:
                 query = query.filter(KbFile.status == status)
             return query.order_by(KbFile.created_at.desc()).all()
 
-    @staticmethod
-    def delete_by_space_id(space_id: int) -> int:
-        with DbSession() as db:
+    def delete_by_space_id(self, space_id: int) -> int:
+        with self._mysql_manager.DbSession() as db:
+            # 确保表已创建
+            self._mysql_manager.Base.metadata.create_all(bind=self._mysql_manager.engine)
+
             updated_rows = (
                 db.query(KbFile)
                 .filter(KbFile.space_id == space_id, KbFile.status == 1)
@@ -165,3 +176,6 @@ class KbFileDAO:
             )
             db.commit()
         return updated_rows
+
+# 创建全局实例
+kb_file_dao = KbFileDAO(global_mysql_manager)

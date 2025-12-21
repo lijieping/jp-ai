@@ -32,13 +32,17 @@ dependencies = [
     "uvicorn[standard]==0.38.0",
     "python-ulid==3.1.0",
     "grandalf>=0.8",
+    "langchain-openai>=1.0.3",
 ]
 
 [project.optional-dependencies]
 eval = [
     "datasets==4.4.1",
+    "pytest==9.0.2",
+    "pytest-mock==3.15.1",
     "ragas==0.4.1",
-    "langchain-ollama==1.0.0"
+    "langchain-ollama==1.0.0",
+    "levenshtein==0.27.3"
 ]
 
 [tool.uv]

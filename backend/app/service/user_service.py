@@ -5,7 +5,7 @@ import jwt
 from jwt import ExpiredSignatureError, DecodeError
 from starlette.responses import JSONResponse
 
-from app.dao.user_dao import UserDAO, UserRole
+from app.dao.user_dao import user_dao, UserRole, UserDAO
 from app.infra.log import logger
 from app.schemas.user_schema import UserInfo
 from app.infra.settings import SETTINGS
@@ -17,23 +17,27 @@ import re
 SESSION_WHITE_LIST = re.compile(r"^(POST /user/session)$")
 GUEST_WHITE_LIST = re.compile(r"^GET /.+|" r"^[A-Z]+ /conversation(?:/.*)?$")
 
-def authenticate(username: str, password: str) -> UserInfo:
-    user = UserDAO.get_by_name(username)
+class UserService:
+    def __init__(self, user_dao: UserDAO):
+        self.user_dao = user_dao
 
-    if not user or not bcrypt.checkpw(password.encode(), user.password.encode()):
-        return None
-    return UserInfo(
-        userId=user.user_id,
-        username=user.username,
-        role=user.role
-    )
+    def authenticate(self, username: str, password: str) -> UserInfo:
+        user = self.user_dao.get_by_name(username)
 
-def create_jwt(user_info: UserInfo) -> str:
-    now = datetime.now(tz=timezone.utc)
-    expire = now + timedelta(minutes=SETTINGS.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
-    # 根据jwt规范，把user_id转成str格式
-    payload = {"user_id": str(user_info.userId), "user_role": user_info.role, "iat": now, "exp": expire}
-    return jwt.encode(payload, SETTINGS.JWT_SECRET, algorithm=SETTINGS.JWT_ALGORITHM)
+        if not user or not bcrypt.checkpw(password.encode(), user.password.encode()):
+            return None
+        return UserInfo(
+            userId=user.user_id,
+            username=user.username,
+            role=user.role
+        )
+
+    def create_jwt(self, user_info: UserInfo) -> str:
+        now = datetime.now(tz=timezone.utc)
+        expire = now + timedelta(minutes=SETTINGS.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
+        # 根据jwt规范，把user_id转成str格式
+        payload = {"user_id": str(user_info.userId), "user_role": user_info.role, "iat": now, "exp": expire}
+        return jwt.encode(payload, SETTINGS.JWT_SECRET, algorithm=SETTINGS.JWT_ALGORITHM)
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
@@ -78,3 +82,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
             status_code=401,
             content={"detail": "登录已过期，请重新登陆" if hasattr(request.state, 'user_token') else "此功能需要登录体验"}
         )
+
+# 创建全局实例
+user_service = UserService(user_dao)

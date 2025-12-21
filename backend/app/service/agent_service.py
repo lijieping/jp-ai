@@ -1,4 +1,5 @@
 import asyncio
+import os
 import random
 from typing import Any, Iterator, Sequence
 
@@ -9,6 +10,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import RemoveMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool
+from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver, CheckpointTuple, Checkpoint, CheckpointMetadata, \
     ChannelVersions
 from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
@@ -20,10 +22,10 @@ from pydantic import BaseModel
 
 from app.infra.agent_memory import get_agent_memory
 from app.infra.log import logger
-from app.infra.mysql import engine
+from app.infra.mysql import mysql_manager
 from app.infra.settings import SETTINGS
-from app.service import rag_service
-from app.service import knowledge_service
+from app.service.rag_service import rag_service
+from app.service.knowledge_service import knowledge_service
 
 def init_small_model() -> BaseChatModel:
     model_name = "qwen2.5-3b-instruct"
@@ -50,7 +52,7 @@ def token_generator(question: str, conversation_id: str):
                 stream_mode="messages"  # messages模式，最细粒度，逐字
         ):
             """token:消息块； metadata：元数据，不暴露给业务"""
-            #print(f"=========conv_id:%s, chunk:%s", conversation_id, token)
+            # print(f"=========conv_id:%s, chunk:%s", conversation_id, token)
             yield token
 
 
@@ -58,7 +60,7 @@ class HybridCheckpointSaver(BaseCheckpointSaver):
     def __init__(self) -> None:
         super().__init__()
         self._cache_saver = get_agent_memory()
-        self._db_saver = PyMySQLSaver(conn=engine.pool.connect())
+        self._db_saver = PyMySQLSaver(conn=mysql_manager.engine.pool.connect())
         self._db_saver.setup()
 
     def get_tuple(self, config: RunnableConfig) -> CheckpointTuple | None:
@@ -123,9 +125,14 @@ class HybridCheckpointSaver(BaseCheckpointSaver):
 
 
 def init_main_model() -> BaseChatModel:
+    # 用OpenAPI的方式调用通义千问， 目前langchain-community的Tongyi类在存在多个tool时会触发bug：
+    # https://github.com/langchain-ai/langchain-community/issues/475
     model_name = "qwen-max"
     # 创建千问model对象，要确保已设置api_key到系统变量DASHSCOPE_API_KEY
     return ChatTongyi(model=model_name, streaming=True) # 模型也要设置streaming=True，不然agent.stream()不生效
+    #     return ChatOpenAI(model=model_name,
+    #                       base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
+    #                       api_key=os.getenv("DASHSCOPE_API_KEY"))
 
 
 def init_sys_prompt() -> str:
@@ -139,7 +146,6 @@ class KnowledgeTool(BaseTool):
     vector_collection: str
 
     def _run(self, query: str, *args: Any, **kwargs: Any) -> str:
-        logger.debug("开始在知识空间[%s]内检索，query：[%s]", self.name, query)
         return rag_service.query_lite_mode(self.vector_collection, question=query)
 
 

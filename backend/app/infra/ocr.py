@@ -6,15 +6,16 @@ import requests
 import json
 
 from app.infra.log import logger
-from app.infra.settings import SETTINGS
+from app.infra.settings import get_settings
 
 def ocr_parse(image_path:str):
-    if SETTINGS.OCR_MODE == "buyan":
+    settings = get_settings()
+    if settings.OCR_MODE == "buyan":
         return buyan_ocr_parse(image_path)
-    elif SETTINGS.OCR_MODE == "easyocr":
+    elif settings.OCR_MODE == "easyocr":
         return ocr_parse(image_path)
     else:
-        raise ValueError(f"非法的SETTINGS.OCR_MODE={SETTINGS.OCR_MODE}")
+        raise ValueError(f"非法的SETTINGS.OCR_MODE={settings.OCR_MODE}")
 
 def buyan_ocr_parse(image_path:str):
     start = time.perf_counter_ns()  # 纳秒级起点

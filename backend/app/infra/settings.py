@@ -61,6 +61,7 @@ class _Settings(BaseSettings):
 def get_settings() -> _Settings:
     return _Settings()
 
+# todo 改成私有， 业务通过get_setting()获取
 SETTINGS : _Settings
 
 def init_settings():

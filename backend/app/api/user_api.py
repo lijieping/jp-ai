@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
 from app.api.api_response import R
-from app.service import user_service
+from app.service.user_service import user_service
 from app.schemas.user_schema import LoginResp, LoginReq
 
 router = APIRouter(tags=["user"], prefix="/user")

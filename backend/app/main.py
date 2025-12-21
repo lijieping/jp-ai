@@ -9,6 +9,9 @@ from app.infra.log import init_logger
 init_logger()
 
 # 3.基础组件
+from app.infra.mysql import mysql_manager
+mysql_manager.initialize()
+
 from fastapi import FastAPI
 app = FastAPI()
 

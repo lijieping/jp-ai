@@ -1,15 +1,16 @@
 from enum import Enum
 from typing import Optional
 
-from app.infra.mysql import Base, DbSession
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, SmallInteger, BigInteger, func, select
+from sqlalchemy import Column, BigInteger, String, SmallInteger, DateTime, func, Enum as SQLEnum, select
+
+from app.infra.mysql import mysql_manager as global_mysql_manager
 
 class UserRole(Enum):
     ADMIN = "admin"
     USER = "user"
     GUEST = "guest"
 
-class User(Base):
+class User(global_mysql_manager.Base):
     __tablename__ = "user"
     user_id    = Column(BigInteger, primary_key=True)
     username   = Column(String(50), nullable=False)
@@ -25,13 +26,14 @@ class User(Base):
     updated_at = Column(DateTime(), server_default=func.now(), onupdate=func.now())
 
 class UserDAO:
+    def __init__(self, mysql_manager=None):
+        self._mysql_manager = mysql_manager or global_mysql_manager
 
-    @staticmethod
-    def get_by_name(user_name: str) -> Optional[User]:
+    def get_by_name(self, user_name: str) -> Optional[User]:
         """
         根据用户名查询有效用户（status=1）
         """
-        with DbSession() as session:
+        with self._mysql_manager.DbSession() as session:
             stmt = (
                 select(User)
                 .where(
@@ -42,12 +44,11 @@ class UserDAO:
             )
             return session.execute(stmt).scalars().first()
 
-    @staticmethod
-    def list_by_ids(ids: list[int]) -> dict[int, User]:
+    def list_by_ids(self, ids: list[int]) -> dict[int, User]:
         if not ids:
             return {}
             
-        with DbSession() as session:
+        with self._mysql_manager.DbSession() as session:
             stmt = (
                 select(User)
                 .where(
@@ -59,3 +60,6 @@ class UserDAO:
             
             # 转换为字典，以user_id为键
             return {user.user_id: user for user in users}
+
+# 创建全局实例
+user_dao = UserDAO(global_mysql_manager)

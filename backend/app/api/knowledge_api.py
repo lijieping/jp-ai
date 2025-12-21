@@ -5,7 +5,8 @@ from fastapi import APIRouter, File, UploadFile, Path, Request, Form
 
 from app.api.api_response import R
 from app.infra.log import logger
-from app.service import knowledge_service, rag_pipeline_service
+from app.service.knowledge_service import knowledge_service
+from app.service.rag_pipeline_service import rag_pipeline_service
 from app.schemas.kb_space_schema import KbSpaceIn
 
 router = APIRouter(prefix="/kb", tags=["kb"])

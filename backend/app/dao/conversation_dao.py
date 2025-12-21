@@ -1,9 +1,9 @@
 from typing import Any, List
 from sqlalchemy import select, func, update, Column, String, DateTime, SmallInteger, BigInteger, JSON
 import ulid
-from app.infra.mysql import Base, DbSession
+from app.infra.mysql import mysql_manager as global_mysql_manager
 
-class Conversation(Base):
+class Conversation(global_mysql_manager.Base):
     __tablename__ = "conversation"
     conv_id    = Column(String(26), primary_key=True)
     user_id    = Column(BigInteger, nullable=False)
@@ -14,18 +14,19 @@ class Conversation(Base):
     meta       = Column(JSON, default=dict)
 
 class ConvDAO:
-    @staticmethod
-    def create(user_id: int, meta: dict) -> str:
-        with DbSession() as db:
+    def __init__(self, mysql_manager=None):
+        self._mysql_manager = mysql_manager or global_mysql_manager
+
+    def create(self, user_id: int, meta: dict) -> str:
+        with self._mysql_manager.DbSession() as db:
             cid = str(ulid.ULID())
             db.add(Conversation(conv_id=cid, user_id=user_id, meta=meta))
             db.commit()
             db.close()
         return cid
 
-    @staticmethod
-    async def async_update(conv_id: str, user_id:int, title:str):
-        with DbSession() as db:
+    async def async_update(self, conv_id: str, user_id:int, title:str):
+        with self._mysql_manager.DbSession() as db:
             stmt = (
                 update(Conversation)
                 .where(Conversation.conv_id == conv_id)
@@ -38,9 +39,8 @@ class ConvDAO:
             db.close()
         return updated_rows
 
-    @staticmethod
-    def list_by_user(user_id: int, offset: int, limit : int):
-        with DbSession() as db:
+    def list_by_user(self, user_id: int, offset: int, limit : int):
+        with self._mysql_manager.DbSession() as db:
             # 分页数据
             stmt = (
                 select(Conversation)
@@ -52,9 +52,8 @@ class ConvDAO:
             rows = db.execute(stmt).scalars().all()
         return rows
 
-    @staticmethod
-    def count_by_user(user_id: int) -> Any:
-        with DbSession() as db:
+    def count_by_user(self, user_id: int) -> Any:
+        with self._mysql_manager.DbSession() as db:
             # 总条数
             total = db.scalar(
                 select(func.count(Conversation.conv_id))
@@ -62,9 +61,8 @@ class ConvDAO:
             )
         return total
 
-    @staticmethod
-    def delete(conv_ids:List[str]):
-        with DbSession() as db:
+    def delete(self, conv_ids:List[str]):
+        with self._mysql_manager.DbSession() as db:
             stmt = (
                 update(Conversation)
                 .where(Conversation.conv_id.in_(conv_ids))
@@ -74,9 +72,11 @@ class ConvDAO:
             db.execute(stmt)
             db.commit()
 
-    @staticmethod
-    def get_by_id(conv_id: str):
-        with DbSession() as db:
+    def get_by_id(self, conv_id: str):
+        with self._mysql_manager.DbSession() as db:
             stmt = select(Conversation).where(Conversation.conv_id == conv_id).limit(1)
         return db.execute(stmt).scalars().first()
+
+# 创建全局实例
+conv_dao = ConvDAO(global_mysql_manager)
 

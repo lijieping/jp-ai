@@ -29,17 +29,23 @@ onKeyStroke(event => event.ctrlKey && event.key.toLowerCase() === 'k', handleCtr
 
 <template>
   <div class="chat-container">
+
     <TitleEditing />
     <div class="chat-content" :class="{ 'sidebar-collapsed': isCollapse }">
       <!-- 默认聊天页面 -->
       <ChatDefaul v-if="!sessionId" />
       <!-- 带id的聊天页面 -->
       <ChatWithId v-else />
+      
     </div>
+    <template>
+</template>
+
   </div>
 </template>
 
 <style lang="scss" scoped>
+
 .chat-container {
   position: relative;
   display: flex;

@@ -3,7 +3,7 @@ from typing import Any, List, Literal, Optional, Sequence, cast, ClassVar
 import numpy as np
 from pydantic import BaseModel, ConfigDict
 
-from app.infra.settings import SETTINGS
+from app.infra.settings import get_settings
 
 MIN_VERSION = "0.2.0"
 
@@ -76,15 +76,29 @@ class FastEmbedBgeSmallEnV15(BaseModel, Embeddings):
 
     dim: ClassVar[int] = 384
 
-    model: Any =  fastembed.TextEmbedding(
-            model_name="BAAI/bge-small-en-v1.5",
-            max_length=512,
-            threads=4,
-            providers=None,
-            specific_model_path=SETTINGS.MODEL_BGE_SMALL_EN_V15_STORE_PATH
-        )
+    _model: Any = None
+    """模型实例，懒加载"""
 
     model_config = ConfigDict(extra="allow", protected_namespaces=())
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 延迟初始化模型
+        self._model = None
+
+    @property
+    def model(self):
+        """懒加载模型实例，确保线程安全"""
+        if self._model is None:
+            # 懒加载模型
+            self._model = fastembed.TextEmbedding(
+                model_name=self.model_name,
+                max_length=self.max_length,
+                threads=self.threads or 4,
+                providers=self.providers,
+                specific_model_path=get_settings().MODEL_BGE_SMALL_EN_V15_STORE_PATH
+            )
+        return self._model
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for documents using FastEmbed.
@@ -123,8 +137,15 @@ class FastEmbedBgeSmallEnV15(BaseModel, Embeddings):
         return cast(List[float], query_embeddings.tolist())
 
 
-def _init_embed() -> Embeddings:
-    #if SETTINGS.PROJECT_MODE == "lite":
-        return FastEmbedBgeSmallEnV15()
+# 单实例模式，使用模块级别的缓存
+_embed_instance = None
 
+def _init_embed() -> Embeddings:
+    """初始化嵌入模型实例，确保只创建一个实例"""
+    global _embed_instance
+    if _embed_instance is None:
+        _embed_instance = FastEmbedBgeSmallEnV15()
+    return _embed_instance
+
+# 创建全局单实例
 embed = _init_embed()

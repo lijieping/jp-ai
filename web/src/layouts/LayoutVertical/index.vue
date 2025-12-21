@@ -3,6 +3,7 @@
 import { computed } from 'vue';
 import { useRoute } from 'vue-router';
 import Header from '@/layouts/components/Header/index.vue';
+import Changelog from '@/layouts/components/Changelog/index.vue';
 import Main from '@/layouts/components/Main/index.vue';
 import { defineAsyncComponent } from 'vue'
 import { useDesignStore } from '@/stores';
@@ -32,6 +33,7 @@ const sidebarComponent = computed(() => {
   const loader = route.meta?.sidebarComponent as (() => Promise<any>) | undefined
   return loader ? defineAsyncComponent(loader) : null
 })
+
 </script>
 
 <template>
@@ -47,6 +49,7 @@ const sidebarComponent = computed(() => {
     </el-header>
     <el-main>
       <Main />
+      <Changelog />
     </el-main>
     </el-container>
   </el-container>

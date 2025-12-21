@@ -10,7 +10,7 @@ from langchain_community.vectorstores.faiss import dependable_faiss_import, _len
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
-from app.infra.settings import SETTINGS
+from app.infra.settings import get_settings
 
 
 class _CUSTOM_FAISS(FAISS):
@@ -93,7 +93,8 @@ class _CUSTOM_FAISS(FAISS):
 
 
 def get_faiss(embedding_function: Embeddings, collection_name: str) -> FAISS:
-    if SETTINGS.VECTOR_STORE_MODE == "faiss":
+    settings = get_settings()
+    if settings.VECTOR_STORE_MODE == "faiss":
         return _CUSTOM_FAISS(
             embedding_function=embedding_function,
             docstore=InMemoryDocstore(),  # langchain外挂kv内存， key：chunk_id，value：文档
@@ -101,11 +102,12 @@ def get_faiss(embedding_function: Embeddings, collection_name: str) -> FAISS:
             index_name=collection_name,
             index=None
         )
-    raise ValueError(f"非法的SETTINGS.VECTOR_STORE_MODE={SETTINGS.VECTOR_STORE_MODE}")
+    raise ValueError(f"非法的SETTINGS.VECTOR_STORE_MODE={settings.VECTOR_STORE_MODE}")
 
 
 def get_chroma(embedding_function: Embeddings, collection_name: str) -> Chroma:
-    if SETTINGS.VECTOR_STORE_MODE == "chroma":
-        return Chroma(collection_name=collection_name, embedding_function=embedding_function, host=SETTINGS.CHROMA_HOST,
-                      port=SETTINGS.CHROMA_PORT)
-    raise ValueError(f"非法的SETTINGS.VECTOR_STORE_MODE={SETTINGS.VECTOR_STORE_MODE}")
+    settings = get_settings()
+    if settings.VECTOR_STORE_MODE == "chroma":
+        return Chroma(collection_name=collection_name, embedding_function=embedding_function, host=settings.CHROMA_HOST,
+                      port=settings.CHROMA_PORT)
+    raise ValueError(f"非法的SETTINGS.VECTOR_STORE_MODE={settings.VECTOR_STORE_MODE}")
