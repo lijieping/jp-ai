@@ -10,7 +10,7 @@ const changelogData = ref<ChangelogItem[]>([
   {
     date: '2025-12-20',
     content: [
-      '演示视频',
+      '文件解析离线评估脚本：文本提取率、CER',
     ]
   },
 ]);
