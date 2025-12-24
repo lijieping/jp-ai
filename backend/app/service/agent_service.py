@@ -24,8 +24,24 @@ from app.infra.agent_memory import get_agent_memory
 from app.infra.log import logger
 from app.infra.mysql import mysql_manager
 from app.infra.settings import SETTINGS
+from app.schemas.message_schema import MsgCreate
 from app.service.rag_service import rag_service
 from app.service.knowledge_service import knowledge_service
+
+
+# 注册在路由中的agent执行函数
+def exec(question: str, conversation_id: str):
+    # 配置对话id，用于记忆对话上下文
+    config = RunnableConfig(configurable={"thread_id": conversation_id})
+    agent = initialize_agent()
+    with ls.tracing_context(enabled=True, project_name="jp-ai"):
+        for chunk in agent.stream(
+                {"messages": [HumanMessage(content=question)]},
+                config=config
+        ):
+            """token:消息块； metadata：元数据，不暴露给业务"""
+            # print(f"=========conv_id:%s, chunk:%s", conversation_id, token)
+            yield chunk
 
 def init_small_model() -> BaseChatModel:
     model_name = "qwen2.5-3b-instruct"
@@ -129,7 +145,7 @@ def init_main_model() -> BaseChatModel:
     # https://github.com/langchain-ai/langchain-community/issues/475
     model_name = "qwen-max"
     # 创建千问model对象，要确保已设置api_key到系统变量DASHSCOPE_API_KEY
-    return ChatTongyi(model=model_name, streaming=True) # 模型也要设置streaming=True，不然agent.stream()不生效
+    return ChatTongyi(model=model_name) # 模型也要设置streaming=True，不然agent.stream()不生效
     #     return ChatOpenAI(model=model_name,
     #                       base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
     #                       api_key=os.getenv("DASHSCOPE_API_KEY"))

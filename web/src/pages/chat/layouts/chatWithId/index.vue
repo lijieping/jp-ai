@@ -64,7 +64,7 @@ watch(
         bubbleItems.value = vo
         // 滚动到底部
         setTimeout(() => {
-          bubbleListRef.value!.scrollToBottom();
+          bubbleListRef.value?.scrollToBottom();
         }, 350);
         return;
       }
@@ -76,7 +76,7 @@ watch(
 
       // 滚动到底部
       setTimeout(() => {
-        bubbleListRef.value!.scrollToBottom();
+        bubbleListRef.value?.scrollToBottom();
       }, 350);
 
       // 判断会话的首条 ，有则直接发送
@@ -96,13 +96,14 @@ watch(
 
 // 封装数据处理逻辑
 function handleDataChunk(chunk: AnyObject) {
-    // 数据处理在sseTextDecoderPlugin
+    // 数据格式处理在sseTextDecoderPlugin
     const type = chunk["type"]
-    if (type === 'AIMessageChunk') {
-      bubbleItems.value[bubbleItems.value.length - 1].content += chunk['content'];
+    const body = chunk["body"]
+    if (type === 'router') {
+      bubbleItems.value[bubbleItems.value.length - 1].content += '<span class="thinking">' + body['reason_and_mode'] + '</span>\n\n';
       bubbleItems.value[bubbleItems.value.length - 1].loading = false;
-    } else if (type === 'tool_call_chunk') {
-      bubbleItems.value[bubbleItems.value.length - 1].content += '<span class="thinking">' + '调用工具：' + chunk["name"] + '</span>\n\n';
+    } else if (type === 'ai') {
+      bubbleItems.value[bubbleItems.value.length - 1].content += body['content']
       bubbleItems.value[bubbleItems.value.length - 1].loading = false;
     }
 
@@ -242,6 +243,8 @@ const thumbDownAnswer = (item:ChatMessageVo) => {
           <div v-if="item.content && item.role === 'user'" class="user-content">
             {{ item.content }}
           </div>
+          <!-- 空内容占位符，防止ElOnlyChild错误 -->
+          <div v-else class="empty-content"></div>
         </template>
         <template #footer="{ item }">
         <div class="footer-container">

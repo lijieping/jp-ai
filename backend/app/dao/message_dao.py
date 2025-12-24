@@ -1,6 +1,9 @@
-from enum import Enum
 
-from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, Text, func, select, and_, JSON
+from enum import Enum
+from typing import Any, Optional
+
+from pydantic import BaseModel
+from sqlalchemy import Column, String, DateTime, Enum as SQLEnum, Text, func, select, and_
 import ulid
 
 from app.infra.mysql import mysql_manager as global_mysql_manager
@@ -8,6 +11,21 @@ from app.infra.mysql import mysql_manager as global_mysql_manager
 class MsgRole(Enum):
     AI = "assistant"
     USER = "user"
+
+class MsgChunkType(Enum):
+    ROUTER = "router"
+    TOOL = "tool"
+    AI = "ai"
+
+
+class MessageStreamChunk(BaseModel):
+
+    type: Optional[str]
+    body: Optional[dict]
+
+    @classmethod
+    def from_attrs(cls, type_enum: MsgChunkType, body:Any) -> "MessageStreamChunk":
+        return cls(type = type_enum.value, body = body)
 
 class Message(global_mysql_manager.Base):
     __tablename__ = "message"

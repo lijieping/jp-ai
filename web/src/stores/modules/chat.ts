@@ -81,12 +81,14 @@ export const useChatStore = defineStore('chat', () => {
     let str = ''
     for (const step of steps) {
       const type = step['type']
-      if (type == 'tool_call') {
-        for (const toolCall of Object.values(step['tool_calls_dict'] as Record<string, any>[])){
-          str = "<span class='thinking'>" + str + '调用工具：' + toolCall.name + "</span>" + '\n\n'
-        }
-      } else if (type == 'ai_content') {
-        str += step['ai_answer'] + '\n\n'
+      const body = step["body"]
+      if (type == 'router') {
+        // for (const toolCall of Object.values(body['reason_and_mode'] as Record<string, any>[])){
+        //   str = "<span class='thinking'>" + str + '调用工具：' + toolCall.name + "</span>" + '\n\n'
+        // }
+        str += "<span class='thinking'>" + str + body['reason_and_mode'] + "</span>" + '\n\n'
+      } else if (type == 'ai') {
+        str += body['content'] + '\n\n'
       }
     }
     return str;

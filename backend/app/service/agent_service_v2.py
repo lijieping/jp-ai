@@ -13,6 +13,13 @@ from langgraph.constants import START, END
 from langgraph.graph import StateGraph
 from pydantic import BaseModel
 
+from app.schemas.message_schema import MsgCreate
+
+
+# 注册在路由中的执行函数
+def exec(body: MsgCreate):
+    return {"messages": []}
+
 # 状态
 class State(BaseModel):
     user_query:str

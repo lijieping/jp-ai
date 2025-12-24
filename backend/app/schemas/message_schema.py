@@ -1,26 +1,6 @@
 from datetime import datetime, timezone
-from enum import Enum
 
 from pydantic import BaseModel, field_serializer
-
-
-class StepType(Enum):
-    AI_CONTENT = "ai_content"
-    TOOL_CALL = "tool_call"
-
-class MsgContentStep(BaseModel):
-    id:str = None
-    type:str = None
-    tool_calls_dict:dict = {} # key:id  value:  toolcall字典
-    ai_answer:str = ''
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'type': self.type,
-            'tool_calls_dict': self.tool_calls_dict,
-            "ai_answer": self.ai_answer
-        }
 
 class MsgCreate(BaseModel):
     role: str

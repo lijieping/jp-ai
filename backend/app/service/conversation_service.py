@@ -2,8 +2,7 @@ import asyncio
 import json
 from typing import List
 
-from _cffi_backend import typeof
-from langchain_core.messages import AIMessageChunk, ToolMessage
+from langchain_core.messages import BaseMessage, AIMessage
 
 from app.infra.log import logger
 from app.infra.tool import is_empty_string
@@ -12,10 +11,11 @@ from app.schemas.page_schema import Page
 from pydantic import TypeAdapter
 
 from app.dao.conversation_dao import conv_dao, ConvDAO
-from app.dao.message_dao import msg_dao, MsgRole, MsgDAO
-from app.service import agent_service
+from app.dao.message_dao import msg_dao, MsgRole, MsgDAO, MessageStreamChunk, MsgChunkType
+from app.service import agent_service, agent_router_service
 from app.schemas.conversation_schema import ConvOut
-from app.schemas.message_schema import MsgCreate, MsgOut, MsgContentStep, StepType
+from app.schemas.message_schema import MsgCreate, MsgOut
+
 
 class ConversationService:
     def __init__(self, conv_dao: ConvDAO, msg_dao: MsgDAO):
@@ -23,73 +23,30 @@ class ConversationService:
         self.msg_dao = msg_dao
 
     def message_create(self, msg_create: MsgCreate):
-        conv_id = msg_create.conv_id
-        user_content = msg_create.content
-        step_chain:list[MsgContentStep] = []
-        lc_id_step_index = {}
-        for langchain_msg_chunk in agent_service.token_generator(user_content, conv_id):
-            if isinstance(langchain_msg_chunk, AIMessageChunk):
-                """AI类型消息，包含tool调用和AI正式回答两种"""
-                # 获取当前步骤
-                step_index = lc_id_step_index.get(langchain_msg_chunk.id)
-                if step_index is None:
-                    # 外层，新步骤初始化
-                    lc_id_step_index[langchain_msg_chunk.id] = len(step_chain)
-                    step = MsgContentStep(id = langchain_msg_chunk.id)
-                    step_chain.append(step)
-                else:
-                    step = step_chain[step_index]
-
-                # 处理流式块
-                if langchain_msg_chunk.chunk_position == "last":
-                    # 步骤结束chunk，不处理
-                    continue
-                elif langchain_msg_chunk.tool_call_chunks:
-                    # tool_call_chunks有值 -> 是工具调用 -> 填充step的tool_calls属性
-                    step.type = StepType.TOOL_CALL.value
-                    lc_tool_call_chunks = langchain_msg_chunk.tool_call_chunks
-                    for lc_tool_call_chunk in lc_tool_call_chunks:
-                        if not isinstance(lc_tool_call_chunk, dict) or not lc_tool_call_chunk.get("type") == "tool_call_chunk":
-                            logger.error("未识别的tool_call_chunk:%s", lc_tool_call_chunk)
-                            continue
-
-                        tool_call_in_step = step.tool_calls_dict.get(lc_tool_call_chunk["id"])
-                        if tool_call_in_step is None:
-                            # step中没有 -> 首次出现的工具调用 -> 初始化
-                            tool_call_in_step = lc_tool_call_chunk
-                            step.tool_calls_dict[lc_tool_call_chunk.get('id')] = tool_call_in_step
-
-                            yield json.dumps(lc_tool_call_chunk)  # 给前端
-                        else:
-                            # step中有 -> 在上面追加内容
-                            tool_call_in_step['args'] += lc_tool_call_chunk['args']
-                elif not is_empty_string(langchain_msg_chunk.content):
-                    # content有值 -> 是AI回答 -> 填充message的content属性
-                    step.type = StepType.AI_CONTENT.value
-                    step.ai_answer += langchain_msg_chunk.content
-                    yield json.dumps(langchain_msg_chunk.model_dump()) # 给前端
-                else:
-                    logger.error("未识别的chunk:%s,%s", type(langchain_msg_chunk), langchain_msg_chunk)
-                    continue
-            elif isinstance(langchain_msg_chunk, ToolMessage):
-                """Tool类型消息"""
-                # 目前是整块，直接追加到step.toolcall.result
-                tool_content = langchain_msg_chunk.content
-                for step in step_chain:
-                    tool_call_in_step = step.tool_calls_dict.get(langchain_msg_chunk.tool_call_id)
-                    if tool_call_in_step:
-                        if 'result' not in tool_call_in_step:
-                            tool_call_in_step['result'] = ''
-                        tool_call_in_step['result'] += tool_content
-                        break
-            else:
-                logger.error("未识别的chunk:%s,%s", typeof(langchain_msg_chunk), langchain_msg_chunk)
-                continue
-
+        # 回答积攒
+        messages_store = []
+        # 意图分析
+        exec_agent, decision_rsp = agent_router_service.route_with_llm(msg_create.content)
+        print(f"decision_rsp ===>{decision_rsp}")
+        router_chunk = MessageStreamChunk.from_attrs(MsgChunkType.ROUTER, decision_rsp)
+        messages_store.append(router_chunk)
+        # 吐意图分析
+        yield json.dumps(router_chunk.model_dump(), ensure_ascii=False)
+        # 吐节点工作信息
+        for exec_chunk_dict in exec_agent(msg_create.content, msg_create.conv_id):
+            model_info = exec_chunk_dict.get("model")
+            if (model_info):
+                messages:BaseMessage = model_info.get('messages')
+                if (messages):
+                    for message in messages:
+                        type = MsgChunkType.AI if isinstance(message, AIMessage) else MsgChunkType.TOOL
+                        main_message_chunk = MessageStreamChunk.from_attrs(type, message.model_dump())
+                        messages_store.append(main_message_chunk)
+                        yield json.dumps(main_message_chunk.model_dump(), ensure_ascii=False)
         # 入库
         with self.conv_dao._mysql_manager.DbSession() as db:
-            self.msg_dao.add(conv_id=conv_id, role= MsgRole.USER, content= msg_create.content, db = db)
-            self.msg_dao.add(conv_id=conv_id, role= MsgRole.AI, content= json.dumps([step.to_dict() for step in step_chain]), db = db)
+            self.msg_dao.add(conv_id=msg_create.conv_id, role= MsgRole.USER, content= msg_create.content, db = db)
+            self.msg_dao.add(conv_id=msg_create.conv_id, role= MsgRole.AI, content= json.dumps([obj.dict() for obj in messages_store], ensure_ascii=False), db = db)
             db.commit()
 
     def message_list(self, conv_id: str):
