@@ -7,10 +7,8 @@ from langchain_core.messages import HumanMessage, BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
-from langchain_openai import OpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph.state import CompiledStateGraph
-from pydantic import SecretStr
 from ragas import evaluate
 from ragas.llms import llm_factory
 from ragas.metrics import context_recall, faithfulness, context_precision
@@ -84,7 +82,6 @@ def run_eval():
         return result   # 返回 dict
     scores = ragas_score(dataset)
     print("RAGAS 三指标:", scores)
-    from dataclasses import asdict
     #open(current_dir / "last_scores.json", "w").write(json.dumps(asdict(scores), ensure_ascii=False, indent=2))
     open(current_dir / "last_scores.json", "w").write(scores.to_pandas().to_string())
 

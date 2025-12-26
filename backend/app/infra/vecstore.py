@@ -88,7 +88,8 @@ class _CUSTOM_FAISS(FAISS):
         index_to_id = {starting_len + j: id_ for j, id_ in enumerate(ids)}
         self.index_to_docstore_id.update(index_to_id)
 
-        self.save_local(folder_path=SETTINGS.FAISS_STORE_PATH, index_name=self.index_name)  # 此处为新加
+        settings = get_settings()
+        self.save_local(folder_path=settings.FAISS_STORE_PATH, index_name=self.index_name)  # 此处为新加
         return ids
 
 
@@ -102,7 +103,7 @@ def get_faiss(embedding_function: Embeddings, collection_name: str) -> FAISS:
             index_name=collection_name,
             index=None
         )
-    raise ValueError(f"非法的SETTINGS.VECTOR_STORE_MODE={settings.VECTOR_STORE_MODE}")
+    raise ValueError(f"非法的VECTOR_STORE_MODE={settings.VECTOR_STORE_MODE}")
 
 
 def get_chroma(embedding_function: Embeddings, collection_name: str) -> Chroma:
@@ -110,4 +111,4 @@ def get_chroma(embedding_function: Embeddings, collection_name: str) -> Chroma:
     if settings.VECTOR_STORE_MODE == "chroma":
         return Chroma(collection_name=collection_name, embedding_function=embedding_function, host=settings.CHROMA_HOST,
                       port=settings.CHROMA_PORT)
-    raise ValueError(f"非法的SETTINGS.VECTOR_STORE_MODE={settings.VECTOR_STORE_MODE}")
+    raise ValueError(f"非法的VECTOR_STORE_MODE={settings.VECTOR_STORE_MODE}")

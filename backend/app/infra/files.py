@@ -3,13 +3,14 @@ import hashlib
 from pathlib import Path
 from typing import BinaryIO, Tuple
 
-from app.infra.settings import SETTINGS
+from app.infra.settings import get_settings
 
 
 def local_file_save(file:BinaryIO, relative_path: str, file_name: str) -> Tuple[str, int, str]:
+    settings = get_settings()
     file_bytes: bytes = file.read()
     # 准备目录
-    store_path = Path(SETTINGS.FILE_STORE_PATH)
+    store_path = Path(settings.FILE_STORE_PATH)
     upload_dir = store_path / relative_path
     upload_dir.mkdir(parents=True, exist_ok=True)
 

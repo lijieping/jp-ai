@@ -1,0 +1,78 @@
+services:
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      MODE: ${MODE:-lite}  # 部署模式：std（标准模式）或 lite（轻量模式），默认为 lite
+      LOG_LEVEL: INFO
+      MYSQL_URL: mysql+pymysql://root:password123@mysql:3306/ai_agent
+      JWT_SECRET: change-me-please
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      GUEST_USER_ID: 666
+      GUEST_CHAT_ALLOW_PROBABILITY: 0.3
+      VECTOR_STORE_MODE: chroma
+      FAISS_STORE_PATH: /data/dev_env_repo/faiss
+      CHROMA_HOST: 117.72.39.0
+      CHROMA_PORT: 18000
+      chroma_http_keepalive_secs: 30.0
+      chroma_http_max_connections: 10
+      chroma_http_max_keepalive_connections: 5
+      AGENT_MEM_MODE: memory
+      REDIS_URL: redis://default:password456@redis:6379
+      FILE_STORE_PATH: /data/dev_env_repo/file
+      MODEL_BGE_SMALL_EN_V15_STORE_PATH: /data/model-repo/models--qdrant--bge-small-en-v1.5-onnx-q
+      DASHSCOPE_API_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxx
+      OCR_MODE: buyan
+      LANGSMITH_API_KEY: xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      AGENT_MSG_SUMMARY_MAX_BEFORE: 4000
+      AGENT_MSG_SUMMARY_TO_KEEP: 15
+      AGENT_MSG_TRIM_TO_KEEP: 15
+    volumes:
+      - /mnt/e/dev_env_repo/faiss:/data/dev_env_repo/faiss # faiss持久化
+      - /mnt/e/dev_env_repo/file:/data/dev_env_repo/file # 文件存储
+      - /mnt/e/model-repo/models--qdrant--bge-small-en-v1.5-onnx-q:/data/model-repo/models--qdrant--bge-small-en-v1.5-onnx-q # bge-small-en-v1.5模型所在dir
+      - /mnt/e/model-repo/easyocr:/data/model-repo/easyocr # easyocr所在dir
+    depends_on:
+      - mysql
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:9000
+    ports:
+      - "80:4173"
+    depends_on:
+      - backend
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password123
+      MYSQL_DATABASE: ai_agent
+    ports:
+      - "3306:3306"
+    volumes:
+      - /mnt/e/dev_env_repo/mysql/data:/var/lib/mysql
+      - /mnt/e/dev_env_repo/mysql/logs:/var/log/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:8.4.0
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - /mnt/e/dev_env_repo/redis/data:/data
+    command: redis-server --requirepass password456
+    profiles:
+      - std  # 仅在标准模式下启动

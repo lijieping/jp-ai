@@ -9,9 +9,6 @@ def make_eval():
 
     # 1) 灌库（等价于 make 的 gold-index 步骤）
 
-    from . import _1_prep_gold
-    from . import _2_run_eval
-
     print("Python 版 make eval 完成")
 
 if __name__ == "__main__":
@@ -22,7 +19,7 @@ if __name__ == "__main__":
     init_settings()
 
     # 2.初始化日志
-    from app.infra.log import init_logger
+    from app.infra import init_logger
 
     init_logger()
 

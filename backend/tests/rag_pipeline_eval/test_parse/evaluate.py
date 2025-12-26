@@ -16,10 +16,12 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Dict, Optional
 from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import Mock, patch
 
 import Levenshtein
+from pytest_mock import mocker
 
-from tests.test_utils import patch_settings
+from tests.mock_settings import mock_settings
 
 logger = logging.getLogger(__name__)
 
@@ -91,68 +93,76 @@ def get_table_info(file_name: str) -> Dict:
 
 def process_single_file(file_path: Path, handler) -> EvaluationResult:
     """处理单个文件"""
-    with patch_settings():
-        from app.service.rag_pipeline_service import Context
-        start_time = os.times().elapsed
+    # 创建模拟的 settings 对象
 
-        try:
-            # 读取金标准数据
-            gold_text = get_gold_text(file_path.name)
-            table_info = get_table_info(file_path.name)
+    with patch('app.infra.mysql.mysql_manager') as mock_mysql_manager:
+        with patch('app.infra.settings.get_settings') as mock_get_settings:
+            mock_get_settings.return_value = mock_settings
+            mock_mysql_manager.return_value = Mock()
 
-            # 使用 FileParseHandler 处理文件
-            ctx = Context(file_url=str(file_path), collection_name="temp")
-            handler.process(ctx)
+            from app.service.rag_pipeline_service import Context
+            start_time = os.times().elapsed
 
-            extracted_text = "".join([doc.page_content for doc in ctx.pages])
+            try:
+                # 读取金标准数据
+                gold_text = get_gold_text(file_path.name)
+                table_info = get_table_info(file_path.name)
 
-            # 计算指标
-            text_extraction_rate, character_error_rate = calculate_text_metrics(extracted_text, gold_text)
-            table_success_count, table_count, table_fidelity_rate = calculate_table_metrics(extracted_text, table_info)
+                # 使用 FileParseHandler 处理文件
+                ctx = Context(file_url=str(file_path), collection_name="temp")
+                handler.process(ctx)
 
-            processing_time = os.times().elapsed - start_time
+                extracted_text = "".join([doc.page_content for doc in ctx.pages])
 
-            logger.info(f"文件 {file_path.name} 处理成功 - 提取率: {text_extraction_rate:.2f}%, "
-                       f"CER: {character_error_rate:.2f}%, 表格保真度: {table_fidelity_rate:.2f}%")
+                # 计算指标
+                text_extraction_rate, character_error_rate = calculate_text_metrics(extracted_text, gold_text)
+                table_success_count, table_count, table_fidelity_rate = calculate_table_metrics(extracted_text, table_info)
 
-            return EvaluationResult(
-                file_name=file_path.name,
-                file_type=file_path.suffix,
-                extracted_text=extracted_text,
-                gold_text=gold_text,
-                text_extraction_rate=text_extraction_rate,
-                character_error_rate=character_error_rate,
-                table_count=table_count,
-                table_success_count=table_success_count,
-                table_fidelity_rate=table_fidelity_rate,
-                processing_time=processing_time,
-                success=True
-            )
+                processing_time = os.times().elapsed - start_time
 
-        except Exception as e:
-            processing_time = os.times().elapsed - start_time
-            logger.error(f"文件 {file_path.name} 处理失败: {str(e)}")
+                logger.info(f"文件 {file_path.name} 处理成功 - 提取率: {text_extraction_rate:.2f}%, "
+                           f"CER: {character_error_rate:.2f}%, 表格保真度: {table_fidelity_rate:.2f}%")
 
-            return EvaluationResult(
-                file_name=file_path.name,
-                file_type=file_path.suffix,
-                extracted_text="",
-                gold_text="",
-                text_extraction_rate=0.0,
-                character_error_rate=0.0,
-                table_count=0,
-                table_success_count=0,
-                table_fidelity_rate=0.0,
-                processing_time=processing_time,
-                success=False,
-                error_message=str(e)
-            )
+                return EvaluationResult(
+                    file_name=file_path.name,
+                    file_type=file_path.suffix,
+                    extracted_text=extracted_text,
+                    gold_text=gold_text,
+                    text_extraction_rate=text_extraction_rate,
+                    character_error_rate=character_error_rate,
+                    table_count=table_count,
+                    table_success_count=table_success_count,
+                    table_fidelity_rate=table_fidelity_rate,
+                    processing_time=processing_time,
+                    success=True
+                )
+
+            except Exception as e:
+                processing_time = os.times().elapsed - start_time
+                logger.error(f"文件 {file_path.name} 处理失败: {str(e)}")
+
+                return EvaluationResult(
+                    file_name=file_path.name,
+                    file_type=file_path.suffix,
+                    extracted_text="",
+                    gold_text="",
+                    text_extraction_rate=0.0,
+                    character_error_rate=0.0,
+                    table_count=0,
+                    table_success_count=0,
+                    table_fidelity_rate=0.0,
+                    processing_time=processing_time,
+                    success=False,
+                    error_message=str(e)
+                )
 
 
 def evaluate_file_parse():
     """执行评估"""
-    # Patch settings using the utility function
-    with patch_settings():
+    # 一行代码替换全局实例
+    with patch('app.infra.mysql.mysql_manager') as mock_mysql_manager:
+        # 配置 mock
+        mock_mysql_manager.return_value = Mock()
         from app.service.rag_pipeline_service import FileParseHandler
         # 初始化
         handler = FileParseHandler()

@@ -11,7 +11,7 @@ def ocr_parse(image_path:str):
     if settings.OCR_MODE == "buyan":
         return buyan_ocr_parse(image_path)
     else:
-        raise ValueError(f"非法的SETTINGS.OCR_MODE={settings.OCR_MODE}")
+        raise ValueError(f"非法的OCR_MODE={settings.OCR_MODE}")
 
 def buyan_ocr_parse(image_path:str):
     start = time.perf_counter_ns()  # 纳秒级起点

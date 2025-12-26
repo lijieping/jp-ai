@@ -1,5 +1,6 @@
 import os
 from functools import lru_cache
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -8,6 +9,8 @@ _env_file_path_str = f".env.{ENVIRONMENT}"
 
 class _Settings(BaseSettings):
     ############################################## 通用配置
+    # 部署模式：std（标准模式）或 lite（轻量模式）
+    MODE: str = "lite"
     # 日志级别
     LOG_LEVEL: str = "INFO"
     # mysql url
@@ -35,7 +38,8 @@ class _Settings(BaseSettings):
 
     # agent checkpoint缓存选项
     AGENT_MEM_MODE:str="memory" # memory/redis
-    REDIS_URL: str
+    # Redis URL，在轻量模式下可选
+    REDIS_URL: Optional[str] = None
     # 向量数据库选项
     VECTOR_STORE_MODE:str="faiss" # faiss/chroma
     FAISS_STORE_PATH: str
@@ -59,9 +63,16 @@ class _Settings(BaseSettings):
 def get_settings() -> _Settings:
     return _Settings()
 
-# todo 改成私有， 业务通过get_setting()获取
-SETTINGS : _Settings
+# 私有变量，业务通过 get_settings() 获取
+_SETTINGS: Optional[_Settings] = None
 
 def init_settings():
-    global SETTINGS
-    SETTINGS = get_settings()
+    global _SETTINGS
+    _SETTINGS = get_settings()
+    settings = _SETTINGS
+    # 配置验证：标准模式下必须提供 REDIS_URL
+    if settings.MODE == "std" and not settings.REDIS_URL:
+        raise ValueError("标准模式（MODE=std）下必须提供 REDIS_URL 环境变量")
+    # 配置验证：轻量模式下不允许使用 Redis 模式
+    if settings.MODE == "lite" and settings.AGENT_MEM_MODE == "redis":
+        raise ValueError("轻量模式（MODE=lite）下不允许使用 Redis 记忆模式（AGENT_MEM_MODE=redis）")

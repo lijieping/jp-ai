@@ -98,12 +98,12 @@ watch(
 function handleDataChunk(chunk: AnyObject) {
     // 数据格式处理在sseTextDecoderPlugin
     const type = chunk["type"]
-    const body = chunk["body"]
+    const content = chunk["content"]
     if (type === 'router') {
-      bubbleItems.value[bubbleItems.value.length - 1].content += '<span class="thinking">' + body['reason_and_mode'] + '</span>\n\n';
+      bubbleItems.value[bubbleItems.value.length - 1].content += '<span class="thinking">' + content+ '</span>\n\n';
       bubbleItems.value[bubbleItems.value.length - 1].loading = false;
     } else if (type === 'ai') {
-      bubbleItems.value[bubbleItems.value.length - 1].content += body['content']
+      bubbleItems.value[bubbleItems.value.length - 1].content += content
       bubbleItems.value[bubbleItems.value.length - 1].loading = false;
     }
 

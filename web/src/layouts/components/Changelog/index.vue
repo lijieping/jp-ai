@@ -12,6 +12,12 @@ const changelogData = ref<ChangelogItem[]>([
     content: [
       '文件解析离线评估脚本：文本提取率、CER',
     ]
+  },  
+  {
+    date: '2025-12-24',
+    content: [
+      'multi-agent,接入路由agent',
+    ]
   },
 ]);
 
