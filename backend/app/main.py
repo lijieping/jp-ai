@@ -13,9 +13,9 @@ init_logger()
 from app.infra import mysql_manager
 mysql_manager.initialize()
 
-# 4.初始化 router_graph（会自动扫描并注册所有 BaseSubAgent 的子类）
-from app.agent.router_agent import router_graph_manager
-router_graph_manager.initialize()  # 这里会自动发现并注册所有子 agent
+# 4.初始化核心主 Agent
+from app.agent.agent_service import core_agent_service
+core_agent_service.get_agent()
 
 from fastapi import FastAPI
 app = FastAPI()

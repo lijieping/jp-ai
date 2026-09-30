@@ -2,7 +2,7 @@ import asyncio
 import json
 from typing import List
 
-from app.agent.sub_agent.daily_agent import daily_angent_service
+from app.agent.agent_service import core_agent_service
 from app.infra import logger
 from app.infra import is_empty_string
 from app.common.schemas import Page
@@ -10,8 +10,7 @@ from app.common.schemas import Page
 from pydantic import TypeAdapter
 
 from app.conversation.dao.conversation_dao import conv_dao, ConvDAO
-from app.conversation.dao.message_dao import msg_dao, MsgRole, MsgDAO, MessageStreamChunk, MsgChunkType
-from app.agent.router_agent import agent_router_service
+from app.conversation.dao.message_dao import msg_dao, MsgRole, MsgDAO, MessageStreamChunk
 from app.conversation.schemas import ConvOut, MsgCreate, MsgOut
 
 
@@ -23,8 +22,8 @@ class ConversationService:
     def message_create(self, msg_create: MsgCreate):
         # 回答积攒
         messages_store = []
-        # 吐节点工作信息
-        for message_chunk in agent_router_service.exec(msg_create.content, msg_create.conv_id):
+        # 直接执行核心主 Agent，不经过意图识别和子 Agent 路由。
+        for message_chunk in core_agent_service.exec(msg_create.content, msg_create.conv_id):
             messages_store.append(message_chunk)
             message_4_web = self._convert_agent_msg(message_chunk)
             yield message_4_web
@@ -36,9 +35,6 @@ class ConversationService:
 
     def _convert_agent_msg(self, message_chunk:MessageStreamChunk) -> str:
         """转换成吐给前端的格式"""
-        message_chunk = message_chunk.model_copy()
-        if message_chunk.type == MsgChunkType.ROUTER.value:
-            message_chunk.content = json.loads(message_chunk.content)['reason_and_mode']
         return json.dumps(message_chunk.model_dump(), ensure_ascii=False)
 
     def message_list(self, conv_id: str):
@@ -84,7 +80,7 @@ class ConversationService:
             logger.error("未找到对话{%s}的消息", conv_id)
             return "无标题会话"
         question = "请根据以下提问内容生成一个不超过十个字的提问标题：" + latest_user_msg.content
-        title = daily_angent_service.small_model_service(question)
+        title = core_agent_service.small_model_service(question)
         asyncio.run(self.conversation_async_update(conv_id, conv.user_id, title))
         return title
 
